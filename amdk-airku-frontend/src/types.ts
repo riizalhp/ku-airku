@@ -144,6 +144,7 @@ export interface RouteStop {
   status: 'Pending' | 'Completed' | 'Failed';
   proofOfDeliveryImage?: string;
   failureReason?: string;
+  distanceFromPrev?: number;
 }
 
 export interface RoutePlan {

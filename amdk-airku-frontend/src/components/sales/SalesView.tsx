@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../hooks/useAppContext';
 import { ICONS } from '../../constants';
 import { Card } from '../ui/Card';
 import { SalesRouteMap } from '../ui/SalesRouteMap';
 import { getDistance } from '../../utils/geolocation';
-import { Store, Product, Visit, VisitStatus, SalesVisitRoutePlan, SalesVisitStop, SurveyResponse, SoughtProduct, CompetitorPrice, CompetitorVolume } from '../../types';
+import { Store, Product, Visit, VisitStatus, SalesVisitRoutePlan, SalesVisitStop, SurveyResponse } from '../../types';
 import { Modal } from '../ui/Modal';
 import { DataView } from './DataView';
 import { getStores, createSalesStore, classifyRegion } from '../../services/storeApiService';
@@ -94,7 +94,7 @@ const VisitSchedule: React.FC = () => {
         if (!todayRoute || todayRoute.stops.length === 0) return [];
 
         let prevLocation = depotLocation;
-        return todayRoute.stops.map((stop, index) => {
+        return todayRoute.stops.map((stop) => {
             const distance = getDistance(prevLocation, stop.location);
             prevLocation = stop.location;
             return {
@@ -502,7 +502,6 @@ type CartItem = {
 
 const RequestOrder: React.FC = () => {
     const queryClient = useQueryClient();
-    const { currentUser } = useAppContext();
     const { data: stores = [] } = useQuery<Store[]>({ queryKey: ['stores'], queryFn: getStores });
     const { data: products = [] } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
     const [selectedStore, setSelectedStore] = useState('');

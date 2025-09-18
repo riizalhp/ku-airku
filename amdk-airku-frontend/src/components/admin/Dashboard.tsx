@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { ICONS } from '../../constants';
-import { OrderStatus, Role, VisitStatus, RoutePlan, SalesVisitRoutePlan, VehicleStatus } from '../../types';
+import { OrderStatus, VisitStatus } from '../../types';
 import { getDashboardData } from '../../services/dashboardApiService';
 
 const kpiData = [

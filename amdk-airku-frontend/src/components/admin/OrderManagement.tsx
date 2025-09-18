@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
-import { Order, OrderStatus, Store, Product, Vehicle, OrderItem, VehicleStatus } from '../../types';
+import { Order, OrderStatus, Store, Product, Vehicle, VehicleStatus } from '../../types';
 import { ICONS } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { getOrders, createOrder, updateOrder, deleteOrder, batchAssignOrders } from '../../services/orderApiService';
@@ -372,9 +372,8 @@ export const OrderManagement: React.FC = () => {
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery<Order[]>({ queryKey: ['orders'], queryFn: getOrders });
     const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({ queryKey: ['vehicles'], queryFn: getVehicles });
     const { data: products = [], isLoading: isLoadingProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
-    const { data: stores = [], isLoading: isLoadingStores } = useQuery<Store[]>({ queryKey: ['stores'], queryFn: getStores });
     
-    const isLoading = isLoadingOrders || isLoadingVehicles || isLoadingProducts || isLoadingStores;
+    const isLoading = isLoadingOrders || isLoadingVehicles || isLoadingProducts;
 
     const { mutate: deleteMutate } = useMutation({
         mutationFn: deleteOrder,

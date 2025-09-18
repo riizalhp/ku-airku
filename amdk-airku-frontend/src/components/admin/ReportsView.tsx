@@ -11,7 +11,7 @@ import { getDeliveryRoutes } from '../../services/routeApiService';
 import { getVehicles } from '../../services/vehicleApiService';
 import { getVisits } from '../../services/visitApiService';
 import { getSurveys } from '../../services/surveyApiService';
-import { Order, Product, OrderStatus, Store, User, Role, RoutePlan, Vehicle, Visit, SurveyResponse, VisitStatus, RouteStop } from '../../types';
+import { Order, Product, OrderStatus, Store, User, Role, RoutePlan, Vehicle, Visit, SurveyResponse, VisitStatus } from '../../types';
 import { ICONS } from '../../constants';
 
 // Reusable hook to fetch all data needed for reports
@@ -103,8 +103,6 @@ const SalesSummaryReport: React.FC = () => {
             ], theme: 'plain'
         });
 
-        let lastY = (doc as any).lastAutoTable.finalY;
-        
         exportWithHeader(doc, 'Daftar Transaksi', periodText, {
             head: [['ID', 'Tanggal', 'Toko', 'Nilai (Rp)']],
             body: filteredOrders.map(o => [o.id.slice(0, 6).toUpperCase(), o.orderDate, o.storeName, Number(o.totalAmount).toLocaleString('id-ID')])
@@ -269,7 +267,7 @@ const DeliveryManifestReport: React.FC = () => {
                 startY: index === 0 ? undefined : lastY + 5,
                 body: stopHeader,
                 theme: 'grid',
-                didDrawPage: (data) => {
+                didDrawPage: () => {
                     doc.setFontSize(16);
                     doc.text("Manifest Pengiriman Harian", 105, 15, { align: 'center' });
                     doc.setFontSize(10);

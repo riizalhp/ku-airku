@@ -86,7 +86,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({ stops, depot }) => {
     : [[depot.lat, depot.lng]];
 
   // Hitung bounds untuk semua titik, termasuk depot
-  let allPositions = [[depot.lat, depot.lng]];
+  let allPositions: [number, number][] = [[depot.lat, depot.lng]];
   if (stopsWithCoords.length > 0) {
     allPositions = [
       ...allPositions,
@@ -124,7 +124,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({ stops, depot }) => {
             ))}
             
             {/* Tampilkan stops tanpa koordinat valid dengan marker khusus */}
-            {stopsWithoutCoords.map((stop, index) => (
+            {stopsWithoutCoords.map((stop) => (
                 <Marker 
                     key={stop.id} 
                     position={[depot.lat, depot.lng]} // Tempatkan di depot sebagai fallback

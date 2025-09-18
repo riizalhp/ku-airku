@@ -1,5 +1,5 @@
 import api from './api';
-import { Visit, VisitStatus } from '../types';
+import { Visit } from '../types';
 
 export const getVisits = async (): Promise<Visit[]> => {
     const response = await api.get('/visits');

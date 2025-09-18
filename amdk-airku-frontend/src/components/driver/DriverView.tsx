@@ -4,7 +4,7 @@ import { useAppContext } from '../../hooks/useAppContext';
 import { ICONS } from '../../constants';
 import { Card } from '../ui/Card';
 import { RouteMap } from '../ui/RouteMap';
-import { RoutePlan, RouteStop, User, Vehicle, VehicleStatus } from '../../types';
+import { RoutePlan, RouteStop, Vehicle, VehicleStatus } from '../../types';
 import { Modal } from '../ui/Modal';
 import { getDeliveryRoutes, updateDeliveryStopStatus, startOrCompleteTrip } from '../../services/routeApiService';
 import { getVehicles } from '../../services/vehicleApiService';
