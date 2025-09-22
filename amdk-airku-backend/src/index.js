@@ -29,7 +29,7 @@ const allowedOrigins = [
   'https://ku-airku-production.up.railway.app'
 ];
 
-// CORS middleware
+// CORS options
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -40,29 +40,24 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
+  credentials: true
 };
 
-// Pasang di paling atas sebelum route
+// Pasang CORS paling atas
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Tangani preflight di semua route
 
-// Middleware parser
+// Tangani semua preflight OPTIONS sebelum route lain
+app.options('*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  return res.sendStatus(200);
+});
+
+// Body parser
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
-
-// Tambahan: manual handler untuk semua OPTIONS (backup)
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    res.set('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.set('Access-Control-Allow-Credentials', 'true');
-    return res.sendStatus(200);
-  }
-  next();
-});
 
 // --- Admin Seeder Function ---
 const seedAdminAccount = async (connection) => {
