@@ -24,27 +24,22 @@ app.disable('etag');
 
 // Middleware
 const allowedOrigins = [
-  'http://localhost:5173',
   'https://ku-airku.vercel.app',
-  'https://ku-airku-production.up.railway.app'
+  'ku-airku-production.up.railway.app'
 ];
 
-// CORS options
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
+app.use(cors({
+  origin: function (origin, callback) {
+    // Izinkan permintaan tanpa origin (seperti dari Postman atau mobile apps)
+    if (!origin) return callback(null, true);
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
 // Body parser
 app.use(express.json({ limit: '5mb' }));
