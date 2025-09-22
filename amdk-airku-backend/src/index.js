@@ -21,8 +21,8 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'http://localhost:5173',                  // Alamat frontend lokal Anda
-  'https://amdk-airku-final.vercel.app',
+  'http://localhost:5173',     
+  'https://ku-airku.vercel.app',
   'ku-airku-production.up.railway.app'
 ];
 
