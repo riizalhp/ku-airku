@@ -19,76 +19,82 @@ const salesVisitRoutes = require('./routes/salesVisitRoutes');
 
 const app = express();
 
+// --- CORS Configuration ---
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://ku-airku.vercel.app',
+  'https://ku-airku-production.up.railway.app'
+];
+
 const corsOptions = {
-  origin: [
-    'http://localhost:5173',
-    'https://ku-airku.vercel.app',
-    'https://ku-airku-production.up.railway.app'
-  ],
-  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  origin: function (origin, callback) {
+    // Izinkan request tanpa origin (misalnya Postman atau server-side)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 200
 };
 
-
+// Apply CORS middleware
 app.use(cors(corsOptions));
-
-// Pastikan menangani preflight request (OPTIONS)
+// Tangani preflight request OPTIONS
 app.options('*', cors(corsOptions));
+
+// Middleware untuk body parser
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
-
 // --- Admin Seeder Function ---
 const seedAdminAccount = async (connection) => {
-    try {
-        const adminEmail = 'admin@kuairku.com';
-        const defaultPassword = '123';
-        
-        const existingAdmin = await User.findByEmail(adminEmail);
+  try {
+    const adminEmail = 'admin@kuairku.com';
+    const defaultPassword = '123';
 
-        if (!existingAdmin) {
-            console.log(`Admin user '${adminEmail}' not found. Creating one with default password...`);
-            await User.create({
-                name: 'Admin Utama',
-                email: adminEmail,
-                role: 'Admin',
-                password: defaultPassword
-            });
-            console.log(`Admin user '${adminEmail}' created successfully.`);
-        } else {
-            // This part handles the case where the user might have manually inserted 
-            // a plain-text password, causing bcrypt.compare to fail.
-            const isMatch = await bcrypt.compare(defaultPassword, existingAdmin.password);
-            if (!isMatch && existingAdmin.password === defaultPassword) {
-                console.log(`Password for '${adminEmail}' is not hashed. Fixing...`);
-                const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-                await connection.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, existingAdmin.id]);
-                console.log(`Password for '${adminEmail}' has been securely updated.`);
-            }
-        }
-    } catch (err) {
-        // Avoid crashing the server for a seeding error, but log it.
-        console.error('An error occurred during the admin account seeding process:', err);
+    const existingAdmin = await User.findByEmail(adminEmail);
+
+    if (!existingAdmin) {
+      console.log(`Admin user '${adminEmail}' not found. Creating one with default password...`);
+      await User.create({
+        name: 'Admin Utama',
+        email: adminEmail,
+        role: 'Admin',
+        password: defaultPassword
+      });
+      console.log(`Admin user '${adminEmail}' created successfully.`);
+    } else {
+      const isMatch = await bcrypt.compare(defaultPassword, existingAdmin.password);
+      if (!isMatch && existingAdmin.password === defaultPassword) {
+        console.log(`Password for '${adminEmail}' is not hashed. Fixing...`);
+        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        await connection.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, existingAdmin.id]);
+        console.log(`Password for '${adminEmail}' has been securely updated.`);
+      }
     }
+  } catch (err) {
+    console.error('An error occurred during the admin account seeding process:', err);
+  }
 };
 
-// Test database connection and seed admin on startup
+// --- Test Database Connection & Seed Admin ---
 pool.getConnection()
-    .then(async conn => {
-        console.log('Successfully connected to database.');
-        
-        // Run the seeder to ensure the admin account is usable
-        await seedAdminAccount(conn);
-        
-        conn.release();
-    })
-    .catch(err => {
-        console.error('Error connecting to database:', err.stack);
-    });
+  .then(async (conn) => {
+    console.log('Successfully connected to database.');
+    await seedAdminAccount(conn);
+    conn.release();
+  })
+  .catch((err) => {
+    console.error('Error connecting to database:', err.stack);
+  });
 
-// Define API routes
+// --- API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
@@ -100,13 +106,13 @@ app.use('/api/visits', visitRoutes);
 app.use('/api/surveys', surveyRoutes);
 app.use('/api/sales-routes', salesVisitRoutes);
 
-
-// Simple test route
+// --- Test Route ---
 app.get('/', (req, res) => {
-    res.send('AMDK Airku Backend is running!');
+  res.send('AMDK Airku Backend is running!');
 });
 
+// --- Start Server ---
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
