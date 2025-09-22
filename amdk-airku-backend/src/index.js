@@ -29,18 +29,24 @@ const allowedOrigins = [
   'https://ku-airku-production.up.railway.app'
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Izinkan permintaan tanpa origin (seperti dari Postman atau mobile apps)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+// CORS middleware with OPTIONS support
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
-  }
-}));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+// Tangani preflight untuk semua route
+app.options('*', cors(corsOptions));
 
 // Middleware untuk body parser
 app.use(express.json({ limit: '5mb' }));
