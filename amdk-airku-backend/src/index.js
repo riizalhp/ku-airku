@@ -43,17 +43,8 @@ const corsOptions = {
   credentials: true
 };
 
-// Pasang CORS paling atas
 app.use(cors(corsOptions));
-
-// Tangani semua preflight OPTIONS sebelum route lain
-app.options('*', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  return res.sendStatus(200);
-});
+app.options('*', cors(corsOptions));
 
 // Body parser
 app.use(express.json({ limit: '5mb' }));
