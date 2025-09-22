@@ -29,7 +29,7 @@ const allowedOrigins = [
   'https://ku-airku-production.up.railway.app'
 ];
 
-// CORS middleware with OPTIONS support
+// CORS middleware
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -44,13 +44,25 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Pasang di paling atas sebelum route
 app.use(cors(corsOptions));
-// Tangani preflight untuk semua route
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // Tangani preflight di semua route
 
-// Middleware untuk body parser
+// Middleware parser
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
+
+// Tambahan: manual handler untuk semua OPTIONS (backup)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.set('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // --- Admin Seeder Function ---
 const seedAdminAccount = async (connection) => {
