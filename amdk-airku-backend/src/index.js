@@ -25,12 +25,12 @@ const corsOptions = {
     'https://ku-airku.vercel.app',
     'https://ku-airku-production.up.railway.app'
   ],
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-  allowedHeaders: "Content-Type,Authorization",
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
-  preflightContinue: false,
   optionsSuccessStatus: 204
 };
+
 
 app.use(cors(corsOptions));
 
