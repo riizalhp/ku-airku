@@ -14,10 +14,16 @@ const createPlan = async (req, res) => {
     }
 
     try {
+        console.log('[Route Planning] Starting route planning for date:', deliveryDate);
+        console.log('[Route Planning] Assignments:', assignments.length);
+        
         // --- 1. Data Fetching and Validation ---
         const assignedVehicleIds = assignments.map(a => a.vehicleId);
         const allVehicles = await Vehicle.getAll();
+        console.log('[Route Planning] Total vehicles in system:', allVehicles.length);
+        
         const assignedVehicles = allVehicles.filter(v => assignedVehicleIds.includes(v.id));
+        console.log('[Route Planning] Assigned vehicles:', assignedVehicles.length);
 
         // Validate that all assigned vehicles exist and are idle before proceeding
         for (const assignment of assignments) {
@@ -28,15 +34,40 @@ const createPlan = async (req, res) => {
             if (vehicle.status !== 'Idle') {
                 return res.status(400).json({ message: `Armada ${vehicle.plateNumber} tidak idle dan tidak dapat dijadwalkan.` });
             }
+            console.log('[Route Planning] Deleting pending plans for vehicle:', vehicle.plateNumber);
             // Delete any previous unstarted plans for this vehicle to allow for replanning
             await Route.deletePendingPlansForVehicle(assignment.vehicleId, deliveryDate);
+            console.log('[Route Planning] Pending plans deleted for vehicle:', vehicle.plateNumber);
         }
 
         // Fetch all routable orders. We only need to do this once.
+        console.log('[Route Planning] Fetching routable orders...');
         let remainingOrders = await Order.findRoutableOrders({ deliveryDate });
+        console.log('[Route Planning] Routable orders found:', remainingOrders.length);
+        
+        // Log order IDs for debugging
+        if (remainingOrders.length > 0) {
+            console.log('[Route Planning] Order IDs:', remainingOrders.map(o => `${o.id.slice(-8)} (${o.storeName})`).join(', '));
+        }
         
         if (remainingOrders.length === 0) {
             return res.status(404).json({ message: "Tidak ada pesanan 'Pending' yang bisa dijadwalkan untuk tanggal yang dipilih." });
+        }
+        
+        // Validate order data integrity
+        for (const order of remainingOrders) {
+            if (!order.location || !order.location.lat || !order.location.lng) {
+                console.error('[Route Planning] Order missing location:', order.id, order);
+                return res.status(500).json({ 
+                    message: `Pesanan ${order.id} tidak memiliki koordinat lokasi yang valid. Silakan periksa data toko.` 
+                });
+            }
+            if (!order.demand || order.demand <= 0) {
+                console.error('[Route Planning] Order missing demand:', order.id, order);
+                return res.status(500).json({ 
+                    message: `Pesanan ${order.id} tidak memiliki data demand yang valid.` 
+                });
+            }
         }
         
         const allCreatedRoutes = [];
@@ -50,6 +81,9 @@ const createPlan = async (req, res) => {
 
             if (!vehicle || remainingOrders.length === 0) continue;
 
+            console.log(`[Route Planning] Processing vehicle: ${vehicle.plateNumber} (capacity: ${vehicle.capacity})`);
+            console.log(`[Route Planning] Remaining orders for this vehicle: ${remainingOrders.length}`);
+            
             // Group remaining orders by store to create nodes for VRP
             const storeStops = remainingOrders.reduce((acc, order) => {
                 if (!acc[order.storeId]) {
@@ -64,23 +98,40 @@ const createPlan = async (req, res) => {
                 return acc;
             }, {});
 
+            console.log(`[Route Planning] Unique stores: ${Object.keys(storeStops).length}`);
+            
             const nodes = Object.values(storeStops).map(store => ({
                 id: store.storeId, // VRP works with store IDs
                 location: store.location, demand: store.totalDemand, priority: store.priority,
             }));
 
+            console.log(`[Route Planning] Nodes for VRP: ${nodes.length}`);
+            console.log(`[Route Planning] Calling calculateSavingsMatrixRoutes...`);
+            
             // Generate optimized trips (of store IDs) for the current vehicle's capacity
             const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, vehicle.capacity);
+            
+            console.log(`[Route Planning] Calculated trips: ${calculatedTrips.length}`);
             
             const routedOrderIdsThisVehicle = new Set();
             
             // For each trip, create a full RoutePlan with all associated orders
             for (const tripStoreIds of calculatedTrips) {
                 const stopsForThisTrip = [];
+                const processedOrderIds = new Set(); // Track processed orders to avoid duplicates
+                
                 for (const storeId of tripStoreIds) {
                     const storeData = storeStops[storeId];
                     if (storeData) {
+                        console.log(`[Route Planning] Processing store ${storeData.storeName} with ${storeData.orderIds.length} orders`);
+                        
                         storeData.orderIds.forEach(orderId => {
+                            // Skip if already processed (shouldn't happen, but defensive)
+                            if (processedOrderIds.has(orderId)) {
+                                console.warn(`[Route Planning] WARNING: Order ${orderId} already processed, skipping duplicate`);
+                                return;
+                            }
+                            
                             const orderData = remainingOrders.find(o => o.id === orderId);
                             if (orderData) {
                                 stopsForThisTrip.push({
@@ -91,17 +142,23 @@ const createPlan = async (req, res) => {
                                     location: orderData.location
                                 });
                                 routedOrderIdsThisVehicle.add(orderId);
+                                processedOrderIds.add(orderId);
                             }
                         });
                     }
                 }
                 
                 if (stopsForThisTrip.length > 0) {
+                    console.log(`[Route Planning] Creating route plan with ${stopsForThisTrip.length} stops`);
+                    console.log(`[Route Planning] Stop order IDs:`, stopsForThisTrip.map(s => s.orderId.slice(-8)));
                     const newRoutePlan = { driverId, vehicleId, date: deliveryDate, stops: stopsForThisTrip };
                     const createdRoute = await Route.createPlan(newRoutePlan);
+                    console.log(`[Route Planning] Route plan created: ${createdRoute.id}`);
                     allCreatedRoutes.push(createdRoute);
                 }
             }
+            
+            console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} routed ${routedOrderIdsThisVehicle.size} orders`);
 
             // Update remaining orders for the next vehicle in the loop
             if (routedOrderIdsThisVehicle.size > 0) {
@@ -115,7 +172,13 @@ const createPlan = async (req, res) => {
 
     } catch (error) {
         console.error('Error creating daily plan:', error);
-        res.status(500).json({ message: 'Terjadi kesalahan pada server saat membuat rencana rute harian.' });
+        console.error('Error stack:', error.stack);
+        console.error('Error message:', error.message);
+        res.status(500).json({ 
+            message: 'Terjadi kesalahan pada server saat membuat rencana rute harian.',
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

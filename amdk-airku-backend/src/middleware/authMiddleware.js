@@ -18,10 +18,35 @@ const protect = (req, res, next) => {
             next();
         } catch (error) {
             console.error(error);
-            res.status(401).json({ message: 'Tidak terotorisasi, token gagal' });
+            
+            // Tangani error token expired secara spesifik
+            if (error.name === 'TokenExpiredError') {
+                return res.status(401).json({ 
+                    message: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                    error: 'TOKEN_EXPIRED',
+                    expiredAt: error.expiredAt
+                });
+            }
+            
+            // Tangani error JWT tidak valid
+            if (error.name === 'JsonWebTokenError') {
+                return res.status(401).json({ 
+                    message: 'Token tidak valid. Silakan login kembali.',
+                    error: 'INVALID_TOKEN'
+                });
+            }
+            
+            // Error lainnya
+            res.status(401).json({ 
+                message: 'Tidak terotorisasi, token gagal',
+                error: 'AUTH_FAILED'
+            });
         }
     } else {
-        res.status(401).json({ message: 'Tidak terotorisasi, tidak ada token' });
+        res.status(401).json({ 
+            message: 'Tidak terotorisasi, tidak ada token',
+            error: 'NO_TOKEN'
+        });
     }
 };
 

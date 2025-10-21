@@ -257,14 +257,16 @@ const Order = {
             JOIN stores s ON o.storeId = s.id
             JOIN order_items oi ON o.id = oi.orderId
             JOIN products p ON oi.productId = p.id
+            LEFT JOIN route_stops rs ON o.id = rs.orderId
+            LEFT JOIN route_plans rp ON rs.routePlanId = rp.id AND rp.date = ?
             WHERE
                 o.status IN ('Pending', 'Failed') AND
                 (o.desiredDeliveryDate <= ? OR o.desiredDeliveryDate IS NULL) AND
-                o.assignedVehicleId IS NULL
-            GROUP BY o.id
+                (o.assignedVehicleId IS NULL OR rs.id IS NULL OR rp.id IS NULL)
+            GROUP BY o.id, o.storeId, o.desiredDeliveryDate, o.priority, s.name, s.address, s.lat, s.lng
             ORDER BY o.priority DESC, o.desiredDeliveryDate ASC
         `;
-        const [rows] = await pool.query(query, [deliveryDate]);
+        const [rows] = await pool.query(query, [deliveryDate, deliveryDate]);
         
         return rows.map(row => ({
             id: row.id,

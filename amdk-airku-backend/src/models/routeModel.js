@@ -62,11 +62,15 @@ const deletePendingPlansForVehicle = async (vehicleId, date) => {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
     try {
+        console.log(`[deletePendingPlans] Cleaning plans for vehicle ${vehicleId} on ${date}`);
+        
         // 1. Find all plans for this vehicle on this date
         const [plans] = await connection.query(
             'SELECT id FROM route_plans WHERE vehicleId = ? AND date = ?',
             [vehicleId, date]
         );
+
+        console.log(`[deletePendingPlans] Found ${plans.length} existing plans`);
 
         if (plans.length === 0) {
             await connection.commit();
@@ -86,6 +90,8 @@ const deletePendingPlansForVehicle = async (vehicleId, date) => {
         const plansWithProgress = new Set(nonPendingCounts.map(row => row.routePlanId));
         const pendingPlanIds = planIds.filter(id => !plansWithProgress.has(id));
 
+        console.log(`[deletePendingPlans] Pending plans to delete: ${pendingPlanIds.length}`);
+
         if (pendingPlanIds.length > 0) {
             // 3. For the un-started plans, get all their order IDs
             const [ordersToReset] = await connection.query(
@@ -94,6 +100,7 @@ const deletePendingPlansForVehicle = async (vehicleId, date) => {
             );
             
             const orderIdsToReset = ordersToReset.map(o => o.orderId);
+            console.log(`[deletePendingPlans] Orders to reset: ${orderIdsToReset.length}`);
 
             // 4. Delete the stops and the plans
             await connection.query(`DELETE FROM route_stops WHERE routePlanId IN (?)`, [pendingPlanIds]);
@@ -106,6 +113,8 @@ const deletePendingPlansForVehicle = async (vehicleId, date) => {
                     [orderIdsToReset]
                 );
             }
+            
+            console.log(`[deletePendingPlans] Cleanup completed successfully`);
         }
         
         await connection.commit();
