@@ -8,7 +8,9 @@ const {
     updateOrder,
     deleteOrder,
     updateOrderStatus,
-    batchAssignOrders
+    batchAssignOrders,
+    validateOrderCapacity,
+    validateMultipleOrdersCapacity
 } = require('../controllers/orderController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -19,6 +21,10 @@ router.route('/')
 
 // Rute baru untuk penugasan massal
 router.post('/batch-assign', protect, admin, batchAssignOrders);
+
+// Rute untuk validasi kapasitas order
+router.post('/validate-capacity', protect, admin, validateOrderCapacity);
+router.post('/validate-multiple-capacity', protect, admin, validateMultipleOrdersCapacity);
 
 // Rute spesifik dengan parameter '/:id/status' harus didefinisikan SEBELUM rute umum '/:id'
 router.route('/:id/status')

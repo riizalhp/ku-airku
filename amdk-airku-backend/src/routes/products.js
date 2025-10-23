@@ -5,9 +5,13 @@ const {
     getProductById,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getCapacityRecommendationAPI
 } = require('../controllers/productController');
 const { protect, admin } = require('../middleware/authMiddleware');
+
+// Helper route untuk mendapatkan rekomendasi kapasitas (untuk membantu user input)
+router.get('/capacity-recommendation', protect, getCapacityRecommendationAPI);
 
 // Rute untuk mendapatkan semua produk dan membuat produk baru
 router.route('/')

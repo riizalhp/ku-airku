@@ -1,19 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { ICONS } from '../../constants';
 import { Product } from '../../types';
 import { Modal } from '../ui/Modal';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../../services/productApiService';
+import { getCapacityRecommendation, estimateConversionRate } from '../../services/capacityApiService';
 
 export const ProductManagement: React.FC = () => {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const initialFormState: Omit<Product, 'id' | 'reservedStock'> = { sku: '', name: '', price: 0, stock: 0, capacityUnit: 1 };
+    const initialFormState: Omit<Product, 'id' | 'reservedStock'> = { 
+        sku: '', 
+        name: '', 
+        price: 0, 
+        stock: 0, 
+        capacityUnit: 1,
+        capacityConversionHeterogeneous: 1 
+    };
     const [currentProduct, setCurrentProduct] = useState<Omit<Product, 'id' | 'reservedStock'> | Product>(initialFormState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [apiError, setApiError] = useState<string | null>(null);
+    const [autoCalculate, setAutoCalculate] = useState(true);
+    const [capacityPreview, setCapacityPreview] = useState<string>('');
 
     const { data: products = [], isLoading } = useQuery<Product[]>({
       queryKey: ['products'],
@@ -73,8 +83,38 @@ export const ProductManagement: React.FC = () => {
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setCurrentProduct(prev => ({ ...prev, [name]: (name === 'price' || name === 'stock' || name === 'capacityUnit') ? parseFloat(value) || 0 : value }));
+        const isNumericField = ['price', 'stock', 'capacityUnit', 'capacityConversionHeterogeneous'].includes(name);
+        setCurrentProduct(prev => ({ 
+            ...prev, 
+            [name]: isNumericField ? parseFloat(value) || 0 : value 
+        }));
     };
+
+    // Auto-calculate capacity saat nama produk berubah
+    useEffect(() => {
+        if (autoCalculate && currentProduct.name && !isEditing) {
+            const estimated = estimateConversionRate(currentProduct.name);
+            setCurrentProduct(prev => ({ 
+                ...prev, 
+                capacityConversionHeterogeneous: estimated 
+            }));
+        }
+    }, [currentProduct.name, autoCalculate, isEditing]);
+
+    // Update preview capacity
+    useEffect(() => {
+        if (currentProduct.capacityConversionHeterogeneous) {
+            const vehicleCapacity = 200; // Contoh kapasitas armada
+            const maxUnitsHomogen = Math.floor(vehicleCapacity / (currentProduct.capacityUnit || 1));
+            const maxUnitsHeterogen = Math.floor(vehicleCapacity / (currentProduct.capacityConversionHeterogeneous || 1));
+            
+            setCapacityPreview(
+                `Armada kapasitas ${vehicleCapacity}: \n` +
+                `• Homogen (1 produk): ${maxUnitsHomogen} unit\n` +
+                `• Heterogen (campur): ${maxUnitsHeterogen} unit`
+            );
+        }
+    }, [currentProduct.capacityUnit, currentProduct.capacityConversionHeterogeneous]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -188,9 +228,76 @@ export const ProductManagement: React.FC = () => {
                             <input type="number" name="stock" id="stock" value={currentProduct.stock} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required />
                         </div>
                     </div>
-                    <div>
-                        <label htmlFor="capacityUnit" className="block text-sm font-medium text-gray-700">Bobot Kapasitas (per unit)</label>
-                        <input type="number" step="0.1" name="capacityUnit" id="capacityUnit" value={currentProduct.capacityUnit} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required />
+                    {/* Pengaturan Kapasitas */}
+                    <div className="border-t pt-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-700">⚙️ Pengaturan Kapasitas</h3>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input 
+                                    type="checkbox" 
+                                    checked={autoCalculate}
+                                    onChange={(e) => setAutoCalculate(e.target.checked)}
+                                    disabled={isEditing}
+                                    className="rounded"
+                                />
+                                <span className="text-gray-600">Hitung Otomatis</span>
+                            </label>
+                        </div>
+
+                        <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800">
+                            <p className="font-medium mb-1">💡 Cara Kerja:</p>
+                            <ul className="list-disc list-inside space-y-1 text-xs">
+                                <li><strong>Homogen</strong>: Armada angkut 1 jenis produk saja (gunakan Capacity Unit)</li>
+                                <li><strong>Heterogen</strong>: Armada angkut berbagai produk (gunakan Konversi Heterogen)</li>
+                            </ul>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="capacityUnit" className="block text-sm font-medium text-gray-700">
+                                    Capacity Unit
+                                    <span className="text-xs text-gray-500 block mt-0.5">(Untuk produk homogen)</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="capacityUnit" 
+                                    id="capacityUnit" 
+                                    value={currentProduct.capacityUnit} 
+                                    onChange={handleInputChange} 
+                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500" 
+                                    required 
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="capacityConversionHeterogeneous" className="block text-sm font-medium text-gray-700">
+                                    Konversi Heterogen
+                                    <span className="text-xs text-gray-500 block mt-0.5">(Untuk produk campur)</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="capacityConversionHeterogeneous" 
+                                    id="capacityConversionHeterogeneous" 
+                                    value={currentProduct.capacityConversionHeterogeneous || 1} 
+                                    onChange={handleInputChange} 
+                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500" 
+                                    disabled={autoCalculate && !isEditing}
+                                    required 
+                                />
+                            </div>
+                        </div>
+
+                        {capacityPreview && (
+                            <div className="bg-green-50 p-3 rounded-lg">
+                                <p className="text-xs font-medium text-green-800 mb-1">📊 Preview Kapasitas:</p>
+                                <pre className="text-xs text-green-700 whitespace-pre-line">{capacityPreview}</pre>
+                            </div>
+                        )}
+
+                        <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                            <strong>Contoh:</strong> Produk 240ml = 1.0, Produk 120ml = 0.5 (setengah ukuran)
+                        </div>
                     </div>
                     {isEditing && 'reservedStock' in currentProduct &&
                          <p className="text-sm text-yellow-700 bg-yellow-100 p-2 rounded-md">Stok dipesan saat ini: {currentProduct.reservedStock}. Mengubah stok fisik tidak akan memengaruhi stok yang sudah dipesan.</p>

@@ -1,5 +1,7 @@
 
 const Order = require('../models/orderModel');
+const Vehicle = require('../models/vehicleModel');
+const { calculateOrderCapacity, validateMultipleOrders } = require('../utils/capacityCalculator');
 
 const getOrders = async (req, res) => {
     try {
@@ -123,6 +125,93 @@ const batchAssignOrders = async (req, res) => {
     }
 };
 
+// Endpoint untuk validasi kapasitas order sebelum assign ke armada
+const validateOrderCapacity = async (req, res) => {
+    const { orderId, vehicleId } = req.body;
+
+    if (!orderId || !vehicleId) {
+        return res.status(400).json({ message: 'ID pesanan dan ID armada diperlukan.' });
+    }
+
+    try {
+        // Ambil data order dengan items dan products
+        const order = await Order.getById(orderId);
+        if (!order) {
+            return res.status(404).json({ message: 'Pesanan tidak ditemukan.' });
+        }
+
+        // Ambil data vehicle
+        const vehicle = await Vehicle.getById(vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({ message: 'Armada tidak ditemukan.' });
+        }
+
+        // Hitung kapasitas
+        const capacityResult = calculateOrderCapacity(order.items, vehicle.capacity);
+
+        res.json({
+            orderId,
+            vehicleId,
+            vehicleName: `${vehicle.model} (${vehicle.plateNumber})`,
+            vehicleCapacity: vehicle.capacity,
+            ...capacityResult,
+            recommendation: capacityResult.canFit 
+                ? `Order dapat dimuat dalam armada ini. Sisa kapasitas: ${capacityResult.remainingCapacity}`
+                : `Order TIDAK DAPAT dimuat dalam armada ini. Kelebihan: ${Math.abs(capacityResult.remainingCapacity)}`
+        });
+    } catch (error) {
+        console.error('Error validating order capacity:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
+    }
+};
+
+// Endpoint untuk validasi multiple orders dalam 1 armada
+const validateMultipleOrdersCapacity = async (req, res) => {
+    const { orderIds, vehicleId } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0 || !vehicleId) {
+        return res.status(400).json({ message: 'Array ID pesanan dan ID armada diperlukan.' });
+    }
+
+    try {
+        // Ambil data vehicle
+        const vehicle = await Vehicle.getById(vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({ message: 'Armada tidak ditemukan.' });
+        }
+
+        // Ambil semua orders
+        const orders = [];
+        for (const orderId of orderIds) {
+            const order = await Order.getById(orderId);
+            if (order) {
+                orders.push(order);
+            }
+        }
+
+        if (orders.length === 0) {
+            return res.status(404).json({ message: 'Tidak ada pesanan yang ditemukan.' });
+        }
+
+        // Validasi kombinasi orders
+        const validationResult = validateMultipleOrders(orders, vehicle.capacity);
+
+        res.json({
+            vehicleId,
+            vehicleName: `${vehicle.model} (${vehicle.plateNumber})`,
+            vehicleCapacity: vehicle.capacity,
+            ordersCount: orders.length,
+            ...validationResult,
+            recommendation: validationResult.canFit 
+                ? `✅ ${orders.length} pesanan dapat dimuat dalam armada ini. Sisa kapasitas: ${validationResult.remainingCapacity} (${100 - validationResult.utilizationPercentage}% kosong)`
+                : `❌ ${orders.length} pesanan TIDAK DAPAT dimuat dalam armada ini. Kelebihan: ${Math.abs(validationResult.remainingCapacity)}. Kurangi jumlah pesanan atau gunakan armada dengan kapasitas lebih besar.`
+        });
+    } catch (error) {
+        console.error('Error validating multiple orders capacity:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
+    }
+};
+
 module.exports = {
     getOrders,
     getOrderById,
@@ -130,5 +219,7 @@ module.exports = {
     updateOrder,
     deleteOrder,
     updateOrderStatus,
-    batchAssignOrders
+    batchAssignOrders,
+    validateOrderCapacity,
+    validateMultipleOrdersCapacity
 };

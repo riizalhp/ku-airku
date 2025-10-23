@@ -1,4 +1,5 @@
 const Product = require('../models/productModel');
+const { getCapacityRecommendation } = require('../utils/capacityCalculator');
 
 const getProducts = async (req, res) => {
     try {
@@ -25,12 +26,30 @@ const getProductById = async (req, res) => {
 };
 
 const createProduct = async (req, res) => {
-    const { sku, name, price, stock, capacityUnit } = req.body;
-    if (!sku || !name || price === undefined || stock === undefined || capacityUnit === undefined) {
+    const { sku, name, price, stock, capacityUnit, capacityConversionHeterogeneous } = req.body;
+    if (!sku || !name || price === undefined || stock === undefined) {
         return res.status(400).json({ message: 'Harap isi semua kolom yang diperlukan.' });
     }
+    
     try {
-        const newProduct = await Product.create({ sku, name, price, stock, capacityUnit });
+        // Auto-calculate capacity conversion jika tidak diisi dan ada info ukuran di nama
+        let finalCapacityUnit = capacityUnit || 1.0;
+        let finalConversionHeterogeneous = capacityConversionHeterogeneous;
+        
+        // Jika capacityConversionHeterogeneous tidak diisi, coba hitung otomatis dari nama produk
+        if (!finalConversionHeterogeneous) {
+            const recommendation = getCapacityRecommendation(name);
+            finalConversionHeterogeneous = recommendation.capacityConversionHeterogeneous;
+        }
+        
+        const newProduct = await Product.create({ 
+            sku, 
+            name, 
+            price, 
+            stock, 
+            capacityUnit: finalCapacityUnit,
+            capacityConversionHeterogeneous: finalConversionHeterogeneous
+        });
         res.status(201).json(newProduct);
     } catch (error) {
         console.error('Error creating product:', error);
@@ -75,10 +94,36 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// Helper endpoint untuk mendapatkan rekomendasi kapasitas berdasarkan nama/ukuran produk
+const getCapacityRecommendationAPI = async (req, res) => {
+    const { productName } = req.query;
+    
+    if (!productName) {
+        return res.status(400).json({ message: 'Parameter productName diperlukan.' });
+    }
+    
+    try {
+        const recommendation = getCapacityRecommendation(productName);
+        res.json({
+            productName,
+            recommendation,
+            guide: {
+                capacityUnit: 'Selalu gunakan 1.0 untuk produk homogen (saat hanya mengangkut 1 jenis produk)',
+                capacityConversionHeterogeneous: 'Konversi yang digunakan saat produk dicampur dengan produk lain. Contoh: 240ml=1.0, 120ml=0.5',
+                example: 'Armada kapasitas 200 bisa mengangkut: 200 unit (homogen) atau berbagai kombinasi (heterogen) sesuai konversi'
+            }
+        });
+    } catch (error) {
+        console.error('Error getting capacity recommendation:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
+    }
+};
+
 module.exports = {
     getProducts,
     getProductById,
     createProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getCapacityRecommendationAPI
 };

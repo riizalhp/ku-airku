@@ -38,7 +38,8 @@ export interface Product {
   price: number;
   stock: number; // Total physical stock
   reservedStock: number; // Stock allocated to pending/routed orders
-  capacityUnit: number;
+  capacityUnit: number; // Kapasitas untuk produk homogen (default 1.0)
+  capacityConversionHeterogeneous?: number; // Konversi untuk produk heterogen
 }
 
 export enum VehicleStatus {
@@ -194,4 +195,59 @@ export interface FeedbackAnalysisResult {
     sentiment: 'Sangat Positif' | 'Positif' | 'Netral' | 'Negatif' | 'Sangat Negatif' | string;
     themes: FeedbackTheme[];
     totalAnalyzed: number;
+}
+
+// ============================================
+// Capacity System Types
+// ============================================
+
+export interface CapacityDetail {
+  productId: string;
+  productName: string;
+  quantity: number;
+  conversionRate: number;
+  capacityNeeded: number;
+  isHomogeneous: boolean;
+}
+
+export interface CapacityValidationResult {
+  totalCapacityUsed: number;
+  remainingCapacity: number;
+  isHomogeneous: boolean;
+  canFit: boolean;
+  utilizationPercentage: number;
+  capacityDetails: CapacityDetail[];
+  recommendation?: string;
+}
+
+export interface CapacityRecommendation {
+  capacityUnit: number;
+  capacityConversionHeterogeneous: number;
+  explanation: string;
+  sizeInLiter?: number;
+}
+
+export interface CapacityRecommendationResponse {
+  productName: string;
+  recommendation: CapacityRecommendation;
+  guide: {
+    capacityUnit: string;
+    capacityConversionHeterogeneous: string;
+    example: string;
+  };
+}
+
+export interface OrderCapacityValidation extends CapacityValidationResult {
+  orderId: string;
+  vehicleId: string;
+  vehicleName: string;
+  vehicleCapacity: number;
+}
+
+export interface MultipleOrdersCapacityValidation extends CapacityValidationResult {
+  vehicleId: string;
+  vehicleName: string;
+  vehicleCapacity: number;
+  ordersCount: number;
+  productTypes: number;
 }
