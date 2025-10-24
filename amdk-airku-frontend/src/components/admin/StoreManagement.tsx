@@ -64,12 +64,11 @@ export const StoreManagement: React.FC = () => {
     const classifyMutation = useMutation({
         mutationFn: classifyRegion,
         onSuccess: (data) => {
+            setApiError('');
+            setCurrentStore(prev => ({ ...prev, region: data.region }));
             if (data.region === 'Bukan di Kulon Progo') {
-                setApiError('Lokasi toko berada di luar wilayah layanan Kulon Progo.');
-                setCurrentStore(prev => ({ ...prev, region: data.region }));
-            } else {
-                setApiError('');
-                setCurrentStore(prev => ({ ...prev, region: data.region }));
+                // Info saja, tetap diizinkan menyimpan
+                console.log('Info: Lokasi berada di luar wilayah Kulon Progo');
             }
         },
         onError: (err: any) => {
@@ -156,11 +155,6 @@ export const StoreManagement: React.FC = () => {
             setApiError('Kode Mitra wajib diisi jika toko adalah mitra.');
             return;
         }
-
-        if (!currentStore.region || currentStore.region === 'Bukan di Kulon Progo') {
-            setApiError('Wilayah belum ditentukan atau berada di luar area layanan.');
-            return;
-        }
         
         const storeData = { ...currentStore, location: finalCoordinates };
         if (!storeData.isPartner) storeData.partnerCode = '';
@@ -178,7 +172,7 @@ export const StoreManagement: React.FC = () => {
         }
     };
     
-    const canSubmit = currentStore.name && currentStore.owner && currentStore.phone && currentStore.region && currentStore.region !== 'Bukan di Kulon Progo' && currentStore.location && !classifyMutation.isPending && (!currentStore.isPartner || (currentStore.isPartner && currentStore.partnerCode));
+    const canSubmit = currentStore.name && currentStore.owner && currentStore.phone && currentStore.region && currentStore.location && !classifyMutation.isPending && (!currentStore.isPartner || (currentStore.isPartner && currentStore.partnerCode));
 
     return (
         <div className="p-8 space-y-6">
@@ -255,10 +249,10 @@ export const StoreManagement: React.FC = () => {
                         <div className="flex items-center gap-2 mt-1">
                             <input type="url" placeholder="Tempel link Google Maps di sini" value={googleMapsLink} onChange={(e) => setGoogleMapsLink(e.target.value)} className="w-full p-2 border rounded" required={!isEditing} />
                         </div>
-                         {currentStore.location && (
+                         {currentStore.location && currentStore.location.lat && currentStore.location.lng && (
                             <div className='mt-2'>
                                 <p className='text-xs text-gray-600'>
-                                    Koordinat Terdeteksi: {currentStore.location.lat.toFixed(6)}, {currentStore.location.lng.toFixed(6)}
+                                    Koordinat Terdeteksi: {Number(currentStore.location.lat).toFixed(6)}, {Number(currentStore.location.lng).toFixed(6)}
                                 </p>
                             </div>
                         )}
@@ -268,11 +262,16 @@ export const StoreManagement: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700">Wilayah</label>
                         <div className={`w-full p-2 border rounded mt-1 font-semibold cursor-not-allowed ${
                             currentStore.region === 'Bukan di Kulon Progo'
-                                ? 'bg-red-100 text-red-700'
+                                ? 'bg-yellow-100 text-yellow-700'
                                 : 'bg-gray-100 text-gray-900'
                         }`}>
                             {classifyMutation.isPending ? 'Menganalisis...' : currentStore.region || 'Tempel link Google Maps untuk deteksi otomatis'}
                         </div>
+                        {currentStore.region === 'Bukan di Kulon Progo' && (
+                            <p className="text-xs text-yellow-600 mt-1">
+                                ⚠️ Lokasi di luar Kulon Progo, tetapi data tetap bisa disimpan
+                            </p>
+                        )}
                     </div>
                     
                     <div className="pt-4 border-t">
