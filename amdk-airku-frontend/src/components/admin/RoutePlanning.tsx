@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
-import { Role, RoutePlan, Vehicle, VehicleStatus, SalesVisitRoutePlan, User, RouteStop } from '../../types';
+import { Role, RoutePlan, Vehicle, VehicleStatus, SalesVisitRoutePlan, User } from '../../types';
 import { ICONS } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { getVehicles } from '../../services/vehicleApiService';
