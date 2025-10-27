@@ -7,14 +7,14 @@ const createPlan = async (plan) => {
     await connection.beginTransaction();
 
     try {
-      const { driverId, vehicleId, date, stops } = plan;
+      const { driverId, vehicleId, date, stops, assignmentStatus = 'assigned' } = plan;
       const planId = randomUUID();
 
-      // Insert into route_plans table
+      // Insert into route_plans table (driverId and vehicleId can be NULL)
       const routePlanQuery = `
-        INSERT INTO route_plans (id, driverId, vehicleId, date) 
-        VALUES (?, ?, ?, ?)`;
-      await connection.query(routePlanQuery, [planId, driverId, vehicleId, date]);
+        INSERT INTO route_plans (id, driverId, vehicleId, date, assignmentStatus) 
+        VALUES (?, ?, ?, ?, ?)`;
+      await connection.query(routePlanQuery, [planId, driverId, vehicleId, date, assignmentStatus]);
       
       if (stops && stops.length > 0) {
         // Prepare bulk insert for route_stops table, now including lat/lng
@@ -38,10 +38,12 @@ const createPlan = async (plan) => {
         // Update the status of the orders included in this new route
         const orderIds = stops.map(stop => stop.orderId);
         const placeholders = orderIds.map(() => '?').join(',');
-        const updateOrdersQuery = `
-          UPDATE orders SET status = 'Routed', assignedVehicleId = ? 
-          WHERE id IN (${placeholders})`;
-        await connection.query(updateOrdersQuery, [vehicleId, ...orderIds]);
+        // If vehicleId is NULL (unassigned route), don't set assignedVehicleId yet
+        const updateOrdersQuery = vehicleId 
+          ? `UPDATE orders SET status = 'Routed', assignedVehicleId = ? WHERE id IN (${placeholders})`
+          : `UPDATE orders SET status = 'Routed' WHERE id IN (${placeholders})`;
+        const updateParams = vehicleId ? [vehicleId, ...orderIds] : orderIds;
+        await connection.query(updateOrdersQuery, updateParams);
       }
 
       await connection.commit();

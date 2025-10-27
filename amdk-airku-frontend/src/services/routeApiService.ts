@@ -18,6 +18,14 @@ export const deleteDeliveryRoute = async (routeId: string): Promise<void> => {
     await api.delete(`/routes/${routeId}`);
 };
 
+export const assignDriverVehicle = async (payload: { routeId: string, vehicleId: string, driverId: string }): Promise<{ success: boolean, message: string }> => {
+    const response = await api.put(`/routes/plan/${payload.routeId}/assign`, {
+        vehicleId: payload.vehicleId,
+        driverId: payload.driverId
+    });
+    return response.data;
+};
+
 export const updateDeliveryStopStatus = async (payload: { stopId: string, status: 'Completed' | 'Failed', proofImage?: string, failureReason?: string }): Promise<void> => {
     await api.put(`/routes/stops/${payload.stopId}/status`, payload);
 }

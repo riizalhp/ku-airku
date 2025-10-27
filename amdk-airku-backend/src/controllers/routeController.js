@@ -9,46 +9,165 @@ const { getDistance } = require('../utils/geolocation');
 const createPlan = async (req, res) => {
     const { deliveryDate, assignments } = req.body;
 
-    if (!deliveryDate || !Array.isArray(assignments) || assignments.length === 0) {
-        return res.status(400).json({ message: "Harap pilih tanggal dan setidaknya satu pasangan armada-pengemudi." });
+    if (!deliveryDate) {
+        return res.status(400).json({ message: "Harap pilih tanggal pengiriman." });
     }
+
+    // New flow: Allow creating route without assignments
+    const hasAssignments = assignments && Array.isArray(assignments) && assignments.length > 0;
 
     try {
         console.log('[Route Planning] Starting route planning for date:', deliveryDate);
-        console.log('[Route Planning] Assignments:', assignments.length);
+        console.log('[Route Planning] Has assignments:', hasAssignments);
         
-        // --- 1. Data Fetching and Validation ---
-        const assignedVehicleIds = assignments.map(a => a.vehicleId);
-        const allVehicles = await Vehicle.getAll();
-        console.log('[Route Planning] Total vehicles in system:', allVehicles.length);
-        
-        const assignedVehicles = allVehicles.filter(v => assignedVehicleIds.includes(v.id));
-        console.log('[Route Planning] Assigned vehicles:', assignedVehicles.length);
-
-        // Validate that all assigned vehicles exist and are idle before proceeding
-        for (const assignment of assignments) {
-            const vehicle = allVehicles.find(v => v.id === assignment.vehicleId);
-            if (!vehicle) {
-                return res.status(404).json({ message: `Armada dengan ID ${assignment.vehicleId} tidak ditemukan.` });
-            }
-            if (vehicle.status !== 'Idle') {
-                return res.status(400).json({ message: `Armada ${vehicle.plateNumber} tidak idle dan tidak dapat dijadwalkan.` });
-            }
-            console.log('[Route Planning] Deleting pending plans for vehicle:', vehicle.plateNumber);
-            // Delete any previous unstarted plans for this vehicle to allow for replanning
-            await Route.deletePendingPlansForVehicle(assignment.vehicleId, deliveryDate);
-            console.log('[Route Planning] Pending plans deleted for vehicle:', vehicle.plateNumber);
-        }
-
-        // Fetch all routable orders. We only need to do this once.
+        // Fetch all routable orders
         console.log('[Route Planning] Fetching routable orders...');
         let remainingOrders = await Order.findRoutableOrders({ deliveryDate });
         console.log('[Route Planning] Routable orders found:', remainingOrders.length);
         
-        // Log order IDs for debugging
-        if (remainingOrders.length > 0) {
-            console.log('[Route Planning] Order IDs:', remainingOrders.map(o => `${o.id.slice(-8)} (${o.storeName})`).join(', '));
+        if (remainingOrders.length === 0) {
+            return res.status(404).json({ message: "Tidak ada pesanan 'Pending' yang bisa dijadwalkan untuk tanggal yang dipilih." });
         }
+
+        // Validate order data integrity
+        for (const order of remainingOrders) {
+            if (!order.location || !order.location.lat || !order.location.lng) {
+                console.error('[Route Planning] Order missing location:', order.id, order);
+                return res.status(500).json({ 
+                    message: `Pesanan ${order.id} tidak memiliki koordinat lokasi yang valid. Silakan periksa data toko.` 
+                });
+            }
+            if (!order.demand || order.demand <= 0) {
+                console.error('[Route Planning] Order missing demand:', order.id, order);
+                return res.status(500).json({ 
+                    message: `Pesanan ${order.id} tidak memiliki data demand yang valid.` 
+                });
+            }
+        }
+
+        // If no assignments provided, create unassigned routes
+        if (!hasAssignments) {
+            return await createUnassignedRoutes(remainingOrders, deliveryDate, res);
+        }
+
+        // Original flow: Create routes with vehicle/driver assignments
+        return await createAssignedRoutes(remainingOrders, deliveryDate, assignments, res);
+
+    } catch (error) {
+        console.error('Error creating daily plan:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error message:', error.message);
+        res.status(500).json({ 
+            message: 'Terjadi kesalahan pada server saat membuat rencana rute harian.',
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+};
+
+// Helper function: Create unassigned routes (no driver/vehicle)
+async function createUnassignedRoutes(orders, deliveryDate, res) {
+    console.log('[Route Planning] Creating unassigned routes...');
+    
+    const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
+    
+    // Group orders by store
+    const storeStops = orders.reduce((acc, order) => {
+        if (!acc[order.storeId]) {
+            acc[order.storeId] = {
+                storeId: order.storeId, 
+                storeName: order.storeName, 
+                address: order.address,
+                location: order.location, 
+                totalDemand: 0, 
+                orderIds: [], 
+                priority: false,
+            };
+        }
+        acc[order.storeId].totalDemand += order.demand;
+        acc[order.storeId].orderIds.push(order.id);
+        if (order.priority) acc[order.storeId].priority = true;
+        return acc;
+    }, {});
+
+    const nodes = Object.values(storeStops).map(store => ({
+        id: store.storeId,
+        location: store.location, 
+        demand: store.totalDemand, 
+        priority: store.priority,
+    }));
+
+    console.log('[Route Planning] Creating routes for', nodes.length, 'stores');
+
+    // Use a default capacity for unassigned routes (can be adjusted later)
+    const DEFAULT_CAPACITY = 500; // Default capacity unit
+    const { calculateSavingsMatrixRoutes } = require('../services/routingService');
+    const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, DEFAULT_CAPACITY);
+    
+    console.log('[Route Planning] Generated', calculatedTrips.length, 'unassigned trips');
+
+    const allCreatedRoutes = [];
+    
+    for (const tripStoreIds of calculatedTrips) {
+        const stopsForThisTrip = [];
+        
+        for (const storeId of tripStoreIds) {
+            const storeData = storeStops[storeId];
+            if (storeData) {
+                storeData.orderIds.forEach(orderId => {
+                    const orderData = orders.find(o => o.id === orderId);
+                    if (orderData) {
+                        stopsForThisTrip.push({
+                            orderId: orderData.id,
+                            storeId: orderData.storeId,
+                            storeName: orderData.storeName,
+                            address: orderData.address,
+                            location: orderData.location
+                        });
+                    }
+                });
+            }
+        }
+        
+        if (stopsForThisTrip.length > 0) {
+            console.log('[Route Planning] Creating unassigned route with', stopsForThisTrip.length, 'stops');
+            const newRoutePlan = { 
+                driverId: null, 
+                vehicleId: null, 
+                date: deliveryDate, 
+                stops: stopsForThisTrip,
+                assignmentStatus: 'unassigned'
+            };
+            const createdRoute = await Route.createPlan(newRoutePlan);
+            allCreatedRoutes.push(createdRoute);
+        }
+    }
+
+    const message = `Berhasil membuat ${allCreatedRoutes.length} rute tanpa assignment. Silakan assign driver dan armada sebelum berangkat.`;
+    res.status(201).json({ success: true, message, routes: allCreatedRoutes });
+}
+
+// Helper function: Create assigned routes (with driver/vehicle)
+async function createAssignedRoutes(remainingOrders, deliveryDate, assignments, res) {
+    console.log('[Route Planning] Creating assigned routes...');
+    console.log('[Route Planning] Assignments:', assignments.length);
+    
+    const assignedVehicleIds = assignments.map(a => a.vehicleId);
+    const allVehicles = await Vehicle.getAll();
+    const assignedVehicles = allVehicles.filter(v => assignedVehicleIds.includes(v.id));
+
+    // Validate vehicles
+    for (const assignment of assignments) {
+        const vehicle = allVehicles.find(v => v.id === assignment.vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({ message: `Armada dengan ID ${assignment.vehicleId} tidak ditemukan.` });
+        }
+        if (vehicle.status !== 'Idle') {
+            return res.status(400).json({ message: `Armada ${vehicle.plateNumber} tidak idle dan tidak dapat dijadwalkan.` });
+        }
+        console.log('[Route Planning] Deleting pending plans for vehicle:', vehicle.plateNumber);
+        await Route.deletePendingPlansForVehicle(assignment.vehicleId, deliveryDate);
+    }
         
         if (remainingOrders.length === 0) {
             return res.status(404).json({ message: "Tidak ada pesanan 'Pending' yang bisa dijadwalkan untuk tanggal yang dipilih." });
@@ -169,18 +288,7 @@ const createPlan = async (req, res) => {
         
         const message = `Berhasil membuat ${allCreatedRoutes.length} perjalanan untuk ${assignments.length} armada, menjadwalkan ${totalRoutedOrders} pesanan.`;
         res.status(201).json({ success: true, message, routes: allCreatedRoutes });
-
-    } catch (error) {
-        console.error('Error creating daily plan:', error);
-        console.error('Error stack:', error.stack);
-        console.error('Error message:', error.message);
-        res.status(500).json({ 
-            message: 'Terjadi kesalahan pada server saat membuat rencana rute harian.',
-            error: error.message,
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-};
+}
 
 
 const getRoutePlans = async (req, res) => {
@@ -286,6 +394,53 @@ const moveOrder = async (req, res) => {
     }
 };
 
+const assignDriverVehicle = async (req, res) => {
+    const { routeId } = req.params;
+    const { driverId, vehicleId } = req.body;
+
+    if (!driverId || !vehicleId) {
+        return res.status(400).json({ message: "Driver ID dan Vehicle ID wajib diisi." });
+    }
+
+    try {
+        // Validate vehicle exists and is idle
+        const vehicle = await Vehicle.getById(vehicleId);
+        if (!vehicle) {
+            return res.status(404).json({ message: "Armada tidak ditemukan." });
+        }
+        if (vehicle.status !== 'Idle') {
+            return res.status(400).json({ message: `Armada ${vehicle.plateNumber} sedang tidak idle dan tidak dapat diassign.` });
+        }
+
+        // Validate driver exists
+        const driver = await User.getById(driverId);
+        if (!driver || driver.role !== 'Driver') {
+            return res.status(404).json({ message: "Driver tidak ditemukan." });
+        }
+
+        // Get route and validate
+        const route = await Route.getById(routeId);
+        if (!route) {
+            return res.status(404).json({ message: "Rute tidak ditemukan." });
+        }
+
+        // Update route with driver and vehicle
+        const success = await Route.assignDriverVehicle(routeId, driverId, vehicleId);
+        
+        if (success) {
+            res.json({ 
+                message: `Berhasil assign ${driver.name} dan ${vehicle.plateNumber} ke rute.`,
+                route: await Route.getById(routeId)
+            });
+        } else {
+            res.status(500).json({ message: "Gagal mengassign driver dan armada." });
+        }
+    } catch (error) {
+        console.error(`Error assigning driver/vehicle to route ${routeId}:`, error);
+        res.status(500).json({ message: error.message || 'Gagal mengassign driver dan armada.' });
+    }
+};
+
 
 module.exports = {
     createPlan,
@@ -294,4 +449,5 @@ module.exports = {
     updateStopStatus,
     deleteRoutePlan,
     moveOrder,
+    assignDriverVehicle,
 };

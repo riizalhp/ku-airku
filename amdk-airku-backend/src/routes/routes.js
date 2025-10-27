@@ -8,14 +8,20 @@ const {
     getRoutePlanById, 
     updateStopStatus,
     deleteRoutePlan,
-    moveOrder
+    moveOrder,
+    assignDriverVehicle
 } = require('../controllers/routeController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 // @route   POST api/routes/plan
-// @desc    Create a new route plan for a vehicle and driver
+// @desc    Create a new route plan (with or without driver/vehicle assignment)
 // @access  Private/Admin
 router.post('/plan', protect, admin, createPlan);
+
+// @route   PUT api/routes/:routeId/assign
+// @desc    Assign driver and vehicle to an unassigned route
+// @access  Private/Admin
+router.put('/:routeId/assign', protect, admin, assignDriverVehicle);
 
 // @route   POST api/routes/move-order
 // @desc    Move an order to a different route or set to pending

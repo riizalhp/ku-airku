@@ -150,11 +150,12 @@ export interface RouteStop {
 
 export interface RoutePlan {
   id: string;
-  driverId: string;
-  vehicleId: string;
+  driverId: string | null;
+  vehicleId: string | null;
   date: string;
   stops: RouteStop[];
   region: string;
+  assignmentStatus: 'unassigned' | 'assigned' | 'departed' | 'completed';
 }
 
 export interface SalesVisitStop {

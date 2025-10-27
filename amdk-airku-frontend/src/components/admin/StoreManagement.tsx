@@ -66,9 +66,9 @@ export const StoreManagement: React.FC = () => {
         onSuccess: (data) => {
             setApiError('');
             setCurrentStore(prev => ({ ...prev, region: data.region }));
-            if (data.region === 'Bukan di Kulon Progo') {
+            if (data.region === 'Bukan di DIY') {
                 // Info saja, tetap diizinkan menyimpan
-                console.log('Info: Lokasi berada di luar wilayah Kulon Progo');
+                console.log('Info: Lokasi berada di luar wilayah DIY (Yogyakarta)');
             }
         },
         onError: (err: any) => {
@@ -193,10 +193,19 @@ export const StoreManagement: React.FC = () => {
                         <ICONS.mapPin />
                     </div>
                     <div>
-                        <h3 className="text-md font-bold text-brand-dark">Informasi Pembagian Wilayah</h3>
+                        <h3 className="text-md font-bold text-brand-dark">Informasi Deteksi Wilayah Otomatis</h3>
                         <p className="text-sm text-gray-700 mt-1">
-                            Titik penentu wilayah <strong>Timur</strong> dan <strong>Barat</strong> adalah garis bujur (longitude) kantor PDAM Tirta Binangun di <strong>110.1486773</strong>.
-                            Deteksi wilayah otomatis akan mengklasifikasikan lokasi toko berdasarkan titik ini.
+                            Sistem akan mendeteksi lokasi toko berdasarkan koordinat dan mengklasifikasikannya ke dalam wilayah DIY (Yogyakarta):
+                        </p>
+                        <ul className="text-sm text-gray-700 mt-2 ml-4 list-disc space-y-1">
+                            <li><strong>Kulon Progo</strong> - Dibagi menjadi Timur/Barat berdasarkan garis bujur PDAM (110.1486773)</li>
+                            <li><strong>Bantul</strong> - Bagian selatan DIY</li>
+                            <li><strong>Kota Yogyakarta</strong> - Pusat kota DIY</li>
+                            <li><strong>Sleman</strong> - Bagian utara DIY</li>
+                            <li><strong>Gunung Kidul</strong> - Bagian timur DIY</li>
+                        </ul>
+                        <p className="text-xs text-gray-600 mt-2">
+                            💡 Lokasi di luar DIY tetap bisa disimpan dengan label "Bukan di DIY"
                         </p>
                     </div>
                 </div>
@@ -205,7 +214,7 @@ export const StoreManagement: React.FC = () => {
             <Card>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div><label className="block text-sm font-medium text-gray-700">Pencarian</label><input type="text" placeholder="Cari nama, pemilik, alamat..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-2 border rounded-md mt-1"/></div>
-                    <div><label className="block text-sm font-medium text-gray-700">Wilayah</label><select value={filterRegion} onChange={e => setFilterRegion(e.target.value)} className="w-full p-2 border rounded-md bg-white mt-1"><option value="all">Semua Wilayah</option><option value="Timur">Timur</option><option value="Barat">Barat</option></select></div>
+                    <div><label className="block text-sm font-medium text-gray-700">Wilayah</label><select value={filterRegion} onChange={e => setFilterRegion(e.target.value)} className="w-full p-2 border rounded-md bg-white mt-1"><option value="all">Semua Wilayah</option><option value="Kulon Progo - Timur">Kulon Progo - Timur</option><option value="Kulon Progo - Barat">Kulon Progo - Barat</option><option value="Bantul">Bantul</option><option value="Kota Yogyakarta">Kota Yogyakarta</option><option value="Sleman">Sleman</option><option value="Gunung Kidul">Gunung Kidul</option><option value="Bukan di DIY">Bukan di DIY</option></select></div>
                     <div><label className="block text-sm font-medium text-gray-700">Status Mitra</label><select value={filterPartnerStatus} onChange={e => setFilterPartnerStatus(e.target.value)} className="w-full p-2 border rounded-md bg-white mt-1"><option value="all">Semua Status</option><option value="yes">Mitra</option><option value="no">Bukan Mitra</option></select></div>
                 </div>
             </Card>
@@ -261,15 +270,22 @@ export const StoreManagement: React.FC = () => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Wilayah</label>
                         <div className={`w-full p-2 border rounded mt-1 font-semibold cursor-not-allowed ${
-                            currentStore.region === 'Bukan di Kulon Progo'
+                            currentStore.region === 'Bukan di DIY'
                                 ? 'bg-yellow-100 text-yellow-700'
+                                : currentStore.region?.includes('Kulon Progo')
+                                ? 'bg-blue-100 text-blue-700'
                                 : 'bg-gray-100 text-gray-900'
                         }`}>
                             {classifyMutation.isPending ? 'Menganalisis...' : currentStore.region || 'Tempel link Google Maps untuk deteksi otomatis'}
                         </div>
-                        {currentStore.region === 'Bukan di Kulon Progo' && (
+                        {currentStore.region === 'Bukan di DIY' && (
                             <p className="text-xs text-yellow-600 mt-1">
-                                ⚠️ Lokasi di luar Kulon Progo, tetapi data tetap bisa disimpan
+                                ⚠️ Lokasi di luar DIY (Yogyakarta), tetapi data tetap bisa disimpan
+                            </p>
+                        )}
+                        {currentStore.region && currentStore.region !== 'Bukan di DIY' && (
+                            <p className="text-xs text-green-600 mt-1">
+                                ✓ Terdeteksi di wilayah: {currentStore.region}
                             </p>
                         )}
                     </div>
