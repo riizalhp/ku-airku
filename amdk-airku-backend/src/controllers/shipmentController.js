@@ -1,5 +1,6 @@
 const Shipment = require('../models/shipmentModel');
 const Order = require('../models/orderModel');
+const Store = require('../models/storeModel');
 const Route = require('../models/routeModel');
 const Vehicle = require('../models/vehicleModel');
 const User = require('../models/userModel');
@@ -86,6 +87,25 @@ const addOrderToShipment = async (req, res) => {
             });
         }
 
+        // ===== REGION VALIDATION: Ensure all orders in shipment are from same region =====
+        if (shipment.orders.length > 0) {
+            // Get store info for the new order
+            const newOrderStore = await Store.getById(order.storeId);
+            if (!newOrderStore) {
+                return res.status(404).json({ message: 'Toko untuk pesanan tidak ditemukan.' });
+            }
+            
+            // Get store info for existing orders in shipment
+            const existingOrder = shipment.orders[0];
+            const existingStore = await Store.getById(existingOrder.storeId);
+            
+            if (existingStore && newOrderStore.region !== existingStore.region) {
+                return res.status(400).json({ 
+                    message: `Tidak dapat menambahkan pesanan dari wilayah "${newOrderStore.region}" ke muatan yang sudah berisi pesanan dari wilayah "${existingStore.region}". Satu muatan hanya boleh berisi pesanan dari wilayah yang sama.` 
+                });
+            }
+        }
+
         await Shipment.addOrder(shipmentId, orderId);
         
         res.json({ 
@@ -147,6 +167,24 @@ const assignShipment = async (req, res) => {
         if (shipment.orders.length === 0) {
             return res.status(400).json({ message: 'Tidak dapat menugaskan muatan kosong.' });
         }
+
+        // ===== REGION VALIDATION: Verify all orders are from same region =====
+        const orderRegions = new Set();
+        for (const order of shipment.orders) {
+            const store = await Store.getById(order.storeId);
+            if (store && store.region) {
+                orderRegions.add(store.region);
+            }
+        }
+        
+        if (orderRegions.size > 1) {
+            return res.status(400).json({ 
+                message: `Shipment berisi pesanan dari ${orderRegions.size} wilayah berbeda (${Array.from(orderRegions).join(', ')}). Satu shipment hanya boleh berisi pesanan dari satu wilayah. Silakan pisahkan pesanan per wilayah.` 
+            });
+        }
+        
+        const shipmentRegion = orderRegions.size > 0 ? Array.from(orderRegions)[0] : 'Unknown';
+        console.log(`[Shipment Assignment] All orders are from region: ${shipmentRegion}`);
 
         // Validate vehicle
         const vehicle = await Vehicle.getById(vehicleId);

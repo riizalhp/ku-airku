@@ -2,7 +2,35 @@
  * This service implements the Clarke-Wright Savings Algorithm to solve the Vehicle Routing Problem.
  * It takes a list of delivery nodes, a depot location, and vehicle capacity to generate
  * optimized delivery routes.
+ * 
+ * INCLUDES: Region-based clustering to separate Timur/Barat before route optimization
  */
+
+/**
+ * Clusters orders by their region to prevent routes from crossing regional boundaries.
+ * @param {Array<object>} orders - Array of orders with region field
+ * @returns {object} Object with region as key and array of orders as value
+ */
+const clusterOrdersByRegion = (orders) => {
+    const clusters = {};
+    
+    orders.forEach(order => {
+        const region = order.region || 'Unknown';
+        
+        if (!clusters[region]) {
+            clusters[region] = [];
+        }
+        
+        clusters[region].push(order);
+    });
+    
+    console.log('[Region Clustering] Clusters created:', Object.keys(clusters).map(region => ({
+        region,
+        orderCount: clusters[region].length
+    })));
+    
+    return clusters;
+};
 
 /**
  * Calculates the Haversine distance between two coordinates.
@@ -110,4 +138,5 @@ const calculateSavingsMatrixRoutes = (nodes, depotLocation, vehicleCapacity) => 
 module.exports = {
     calculateSavingsMatrixRoutes,
     getDistance,
+    clusterOrdersByRegion,
 };
