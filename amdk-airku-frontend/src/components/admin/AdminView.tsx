@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ICONS } from '../../constants';
 import { Dashboard } from './Dashboard';
 import { UserManagement } from './UserManagement';
@@ -13,69 +14,38 @@ import { ReportsView } from './ReportsView';
 import { useAppContext } from '../../hooks/useAppContext';
 import { TripHistory } from './TripHistory';
 
-type AdminPage = 'dashboard' | 'users' | 'stores' | 'products' | 'fleet' | 'vehicles' | 'orders' | 'schedule' | 'surveys' | 'reports' | 'tripHistory';
-
 // Menu items are ordered based on the admin's typical workflow.
-const navItems: { id: AdminPage; label: string; icon: React.ReactNode }[] = [
+const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     // --- Group 1: Overview & Analysis ---
-    // High-level views to start the day.
-    { id: 'dashboard', label: 'Dashboard', icon: <ICONS.dashboard /> },
-    { id: 'reports', label: 'Laporan', icon: <ICONS.fileText /> },
+    { path: '', label: 'Dashboard', icon: <ICONS.dashboard /> },
+    { path: 'reports', label: 'Laporan', icon: <ICONS.fileText /> },
     
     // --- Group 2: Daily Operations ---
-    // Core, high-frequency operational tasks.
-    // REMOVED: routePlanning - Functionality moved to FleetManagement
-    { id: 'fleet', label: 'Manajemen Muatan & Armada', icon: <ICONS.fleet /> }, // Load management with assignment
-    { id: 'tripHistory', label: 'Riwayat Perjalanan', icon: <ICONS.history /> },
+    { path: 'fleet', label: 'Manajemen Muatan & Armada', icon: <ICONS.fleet /> },
+    { path: 'trip-history', label: 'Riwayat Perjalanan', icon: <ICONS.history /> },
     
     // --- Group 3: Sales & Data Entry ---
-    // Managing incoming data and sales activities.
-    { id: 'orders', label: 'Manajemen Pesanan', icon: <ICONS.orders /> },
-    { id: 'schedule', label: 'Jadwal Kunjungan', icon: <ICONS.calendar /> },
-    { id: 'surveys', label: 'Laporan Survei', icon: <ICONS.survey /> },
+    { path: 'orders', label: 'Manajemen Pesanan', icon: <ICONS.orders /> },
+    { path: 'schedule', label: 'Jadwal Kunjungan', icon: <ICONS.calendar /> },
+    { path: 'surveys', label: 'Laporan Survei', icon: <ICONS.survey /> },
     
     // --- Group 4: Master Data Management ---
-    // Less frequent configuration and data management.
-    { id: 'stores', label: 'Manajemen Toko', icon: <ICONS.store /> },
-    { id: 'products', label: 'Manajemen Produk', icon: <ICONS.product /> },
-    { id: 'vehicles', label: 'Manajemen Armada', icon: <ICONS.fleet /> },
-    { id: 'users', label: 'Manajemen Pengguna', icon: <ICONS.users /> },
+    { path: 'stores', label: 'Manajemen Toko', icon: <ICONS.store /> },
+    { path: 'products', label: 'Manajemen Produk', icon: <ICONS.product /> },
+    { path: 'vehicles', label: 'Manajemen Armada', icon: <ICONS.fleet /> },
+    { path: 'users', label: 'Manajemen Pengguna', icon: <ICONS.users /> },
 ];
 
 
 export const AdminView: React.FC = () => {
     const { logout, currentUser } = useAppContext();
-    const [activePage, setActivePage] = useState<AdminPage>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
 
-    const renderContent = () => {
-        switch (activePage) {
-            case 'dashboard':
-                return <Dashboard />;
-            case 'reports':
-                return <ReportsView />;
-            case 'tripHistory':
-                return <TripHistory />;
-            case 'users':
-                return <UserManagement />;
-            case 'stores':
-                 return <StoreManagement />;
-            case 'products':
-                return <ProductManagement />;
-            case 'orders':
-                return <OrderManagement />;
-            case 'vehicles':
-                return <VehicleManagement />;
-            case 'fleet':
-                return <FleetManagement />;
-            case 'schedule':
-                return <VisitSchedule />;
-            case 'surveys':
-                return <SurveyReports />;
-            default:
-                return <Dashboard />;
-        }
-    };
+    // Get current page from URL
+    const currentPath = location.pathname.replace('/admin/', '').replace('/admin', '');
+    const activePage = navItems.find(item => item.path === currentPath)?.label || 'Dashboard';
 
     const sidebarContent = (
         <>
@@ -83,23 +53,27 @@ export const AdminView: React.FC = () => {
                 KU AIRKU
             </div>
             <nav className="flex-1 mt-6 space-y-2">
-                {navItems.map(item => (
-                    <button
-                        key={item.id}
-                        onClick={() => {
-                            setActivePage(item.id);
-                            setIsSidebarOpen(false); // Close on mobile navigation
-                        }}
-                        className={`w-full flex items-center space-x-3 px-6 py-3 text-left transition duration-200 ${
-                            activePage === item.id 
-                            ? 'bg-brand-primary' 
-                            : 'hover:bg-brand-primary hover:bg-opacity-50'
-                        }`}
-                    >
-                        {item.icon}
-                        <span>{item.label}</span>
-                    </button>
-                ))}
+                {navItems.map(item => {
+                    const isActive = currentPath === item.path || 
+                                   (currentPath === '' && item.path === '');
+                    return (
+                        <button
+                            key={item.path}
+                            onClick={() => {
+                                navigate(`/admin/${item.path}`);
+                                setIsSidebarOpen(false);
+                            }}
+                            className={`w-full flex items-center space-x-3 px-6 py-3 text-left transition duration-200 ${
+                                isActive
+                                ? 'bg-brand-primary' 
+                                : 'hover:bg-brand-primary hover:bg-opacity-50'
+                            }`}
+                        >
+                            {item.icon}
+                            <span>{item.label}</span>
+                        </button>
+                    );
+                })}
             </nav>
             <div className="p-4 border-t border-blue-900">
                 <div className="px-4 py-2 mb-2">
@@ -136,13 +110,26 @@ export const AdminView: React.FC = () => {
                         <ICONS.menu />
                     </button>
                     <span className="text-lg font-bold text-brand-dark">
-                        {navItems.find(item => item.id === activePage)?.label}
+                        {activePage}
                     </span>
                     <div className="w-8"></div> {/* Spacer */}
                 </header>
 
                 <div className="flex-1">
-                    {renderContent()}
+                    <Routes>
+                        <Route index element={<Dashboard />} />
+                        <Route path="reports" element={<ReportsView />} />
+                        <Route path="trip-history" element={<TripHistory />} />
+                        <Route path="users" element={<UserManagement />} />
+                        <Route path="stores" element={<StoreManagement />} />
+                        <Route path="products" element={<ProductManagement />} />
+                        <Route path="orders" element={<OrderManagement />} />
+                        <Route path="vehicles" element={<VehicleManagement />} />
+                        <Route path="fleet" element={<FleetManagement />} />
+                        <Route path="schedule" element={<VisitSchedule />} />
+                        <Route path="surveys" element={<SurveyReports />} />
+                        <Route path="*" element={<Navigate to="/admin" replace />} />
+                    </Routes>
                 </div>
             </main>
         </div>

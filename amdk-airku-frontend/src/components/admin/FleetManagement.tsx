@@ -6,8 +6,7 @@ import { getUsers } from '../../services/userApiService';
 import { getShipments, assignShipment, deleteShipment, createShipment, removeOrderFromShipment } from '../../services/shipmentApiService';
 import { getOrders } from '../../services/orderApiService';
 import { getProducts } from '../../services/productApiService';
-import { getStores } from '../../services/storeApiService';
-import { VehicleStatus, Vehicle, User, Order, Product, Store, Shipment, Role } from '../../types';
+import { VehicleStatus, Vehicle, User, Order, Product, Shipment, Role } from '../../types';
 import { Modal } from '../ui/Modal';
 import { ICONS } from '../../constants';
 
@@ -161,7 +160,6 @@ export const FleetManagement: React.FC = () => {
     });
     const { data: orders = [] } = useQuery<Order[]>({ queryKey: ['orders'], queryFn: getOrders });
     const { data: products = [] } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
-    const { data: stores = [] } = useQuery<Store[]>({ queryKey: ['stores'], queryFn: getStores });
 
     const createShipmentMutation = useMutation({
         mutationFn: createShipment,

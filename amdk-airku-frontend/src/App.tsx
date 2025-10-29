@@ -1,5 +1,6 @@
 
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Role } from './types';
 import { AdminView } from './components/admin/AdminView';
 import { SalesView } from './components/sales/SalesView';
@@ -129,37 +130,130 @@ const RegistrationView: React.FC<{ onSwitchToLogin: () => void }> = ({ onSwitchT
 };
 
 const AuthView: React.FC = () => {
-    const [view, setView] = useState<'login' | 'register'>('login');
+    const location = useLocation();
+    const navigate = useNavigate();
+    const isRegisterPage = location.pathname === '/register';
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-brand-background">
-            {view === 'login' ? (
-                <LoginView onSwitchToRegister={() => setView('register')} />
+            {isRegisterPage ? (
+                <RegistrationView onSwitchToLogin={() => navigate('/login')} />
             ) : (
-                <RegistrationView onSwitchToLogin={() => setView('login')} />
+                <LoginView onSwitchToRegister={() => navigate('/register')} />
             )}
         </div>
     );
 };
 
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: Role }> = ({ children, allowedRole }) => {
+    const { currentUser } = useAppContext();
+    const location = useLocation();
+
+    if (!currentUser) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    if (allowedRole && currentUser.role !== allowedRole) {
+        // Redirect to appropriate dashboard based on role
+        const rolePath = currentUser.role === Role.ADMIN ? '/admin' 
+                      : currentUser.role === Role.SALES ? '/sales' 
+                      : '/driver';
+        return <Navigate to={rolePath} replace />;
+    }
+
+    return <>{children}</>;
+};
+
 
 const App: React.FC = () => {
     const { currentUser } = useAppContext();
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    if (!currentUser) {
-        return <AuthView />;
-    }
+    // Redirect to appropriate dashboard when user logs in
+    useEffect(() => {
+        if (currentUser && (location.pathname === '/' || location.pathname === '/login')) {
+            const rolePath = currentUser.role === Role.ADMIN ? '/admin' 
+                          : currentUser.role === Role.SALES ? '/sales' 
+                          : '/driver';
+            navigate(rolePath, { replace: true });
+        }
+    }, [currentUser, location.pathname, navigate]);
 
-    switch (currentUser.role) {
-        case Role.ADMIN:
-            return <AdminView />;
-        case Role.SALES:
-            return <SalesView />;
-        case Role.DRIVER:
-            return <DriverView />;
-        default:
-            return <AuthView />;
-    }
+    return (
+        <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={
+                currentUser ? (
+                    <Navigate to={
+                        currentUser.role === Role.ADMIN ? '/admin' 
+                        : currentUser.role === Role.SALES ? '/sales' 
+                        : '/driver'
+                    } replace />
+                ) : (
+                    <AuthView />
+                )
+            } />
+            <Route path="/register" element={
+                currentUser ? (
+                    <Navigate to={
+                        currentUser.role === Role.ADMIN ? '/admin' 
+                        : currentUser.role === Role.SALES ? '/sales' 
+                        : '/driver'
+                    } replace />
+                ) : (
+                    <AuthView />
+                )
+            } />
+
+            {/* Protected Routes */}
+            <Route path="/admin/*" element={
+                <ProtectedRoute allowedRole={Role.ADMIN}>
+                    <AdminView />
+                </ProtectedRoute>
+            } />
+            <Route path="/sales/*" element={
+                <ProtectedRoute allowedRole={Role.SALES}>
+                    <SalesView />
+                </ProtectedRoute>
+            } />
+            <Route path="/driver/*" element={
+                <ProtectedRoute allowedRole={Role.DRIVER}>
+                    <DriverView />
+                </ProtectedRoute>
+            } />
+
+            {/* Default Route */}
+            <Route path="/" element={
+                currentUser ? (
+                    <Navigate to={
+                        currentUser.role === Role.ADMIN ? '/admin' 
+                        : currentUser.role === Role.SALES ? '/sales' 
+                        : '/driver'
+                    } replace />
+                ) : (
+                    <Navigate to="/login" replace />
+                )
+            } />
+
+            {/* 404 Not Found */}
+            <Route path="*" element={
+                <div className="flex items-center justify-center min-h-screen bg-brand-background">
+                    <div className="text-center">
+                        <h1 className="text-6xl font-bold text-brand-dark">404</h1>
+                        <p className="mt-4 text-xl text-gray-600">Halaman tidak ditemukan</p>
+                        <button 
+                            onClick={() => navigate('/')}
+                            className="mt-6 px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-dark"
+                        >
+                            Kembali ke Beranda
+                        </button>
+                    </div>
+                </div>
+            } />
+        </Routes>
+    );
 };
 
 export default App;

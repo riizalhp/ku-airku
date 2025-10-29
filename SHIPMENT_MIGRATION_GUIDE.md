@@ -7,6 +7,7 @@ Sistem telah direfactor dari **vehicle-centric** menjadi **shipment-centric** un
 ## 📋 Perubahan Utama
 
 ### **BEFORE (Old System):**
+
 ```
 1. Admin membuat rute di "Perencanaan Rute"
 2. Pilih tanggal → Pilih armada & driver → Generate rute
@@ -14,6 +15,7 @@ Sistem telah direfactor dari **vehicle-centric** menjadi **shipment-centric** un
 ```
 
 ### **AFTER (New System):**
+
 ```
 1. Admin membuat "Muatan" di "Manajemen Muatan & Armada"
 2. Tambah pesanan ke muatan dari "Manajemen Pesanan"
@@ -70,6 +72,7 @@ DESCRIBE orders;
 ```
 
 Expected output:
+
 ```
 +-------------+--------------+------+-----+---------+-------+
 | Field       | Type         | Null | Key | Default | Extra |
@@ -94,6 +97,7 @@ npm start
 ```
 
 Verify backend started successfully:
+
 ```
 Server is running on port 3001
 Successfully connected to database.
@@ -141,6 +145,7 @@ Access: http://localhost:5173
 5. Klik **"Tugaskan & Buat Rute"**
 
 **Result:**
+
 - Status muatan berubah jadi **"Sudah Ditugaskan"**
 - Rute optimal otomatis dibuat menggunakan Clarke-Wright Algorithm
 - Pesanan berubah status dari **Pending** → **Routed**
@@ -170,23 +175,28 @@ DROP TABLE IF EXISTS shipments;
 ## 🐛 **TROUBLESHOOTING**
 
 ### **Error: Can't connect to MySQL server**
+
 - Pastikan MySQL service running
 - Windows: Services → MySQL80 → Start
 - Linux/Mac: `sudo systemctl start mysql`
 
 ### **Error: Table 'shipments' already exists**
+
 - Migration sudah pernah dijalankan
 - Skip atau jalankan rollback script terlebih dahulu
 
 ### **Error: Column 'shipment_id' doesn't exist**
+
 - Migration belum dijalankan
 - Jalankan migration script
 
 ### **Frontend Error: Cannot read properties of undefined**
+
 - Backend belum running
 - Pastikan backend di port 3001 sudah aktif
 
 ### **No shipments showing in Fleet Management**
+
 - Belum ada muatan yang dibuat
 - Klik "Buat Muatan Baru" terlebih dahulu
 
@@ -214,14 +224,14 @@ CREATE TABLE shipments (
 ### **Updated Table: orders**
 
 ```sql
-ALTER TABLE orders 
+ALTER TABLE orders
 ADD COLUMN shipment_id VARCHAR(36) NULL;
 ```
 
 ### **Updated Table: route_plans**
 
 ```sql
-ALTER TABLE route_plans 
+ALTER TABLE route_plans
 ADD COLUMN shipment_id VARCHAR(36) NULL;
 ```
 
