@@ -32,10 +32,13 @@
 ## 🎯 Project Overview
 
 ### Deskripsi Singkat
+
 KU AIRKU adalah sistem manajemen distribusi air minum terintegrasi yang dikembangkan untuk PDAM Tirta Binangun, Kabupaten Kulon Progo. Sistem ini mengotomatisasi proses pengiriman, routing, dan manajemen armada dengan algoritma optimasi berbasis AI.
 
 ### Problem Statement
+
 PDAM Tirta Binangun menghadapi tantangan dalam:
+
 - Manajemen rute pengiriman yang tidak optimal
 - Tracking pesanan manual yang rentan error
 - Kapasitas armada tidak termanfaatkan maksimal
@@ -43,7 +46,9 @@ PDAM Tirta Binangun menghadapi tantangan dalam:
 - Tidak ada sistem real-time untuk monitoring pengiriman
 
 ### Solution
+
 Sistem terintegrasi berbasis web dengan:
+
 - ✅ Optimasi rute otomatis menggunakan Clarke-Wright Savings Algorithm
 - ✅ Deteksi wilayah otomatis dengan AI (Google Gemini 2.5 Flash)
 - ✅ Sistem manajemen muatan (shipment-based load management)
@@ -53,6 +58,7 @@ Sistem terintegrasi berbasis web dengan:
 - ✅ Dashboard analytics dan reporting
 
 ### Key Metrics
+
 - 🚀 **40% pengurangan** waktu perencanaan rute
 - 📊 **30% peningkatan** efisiensi kapasitas armada
 - 🎯 **95% akurasi** klasifikasi wilayah otomatis
@@ -137,53 +143,53 @@ User Action → React Component → API Service (Axios)
 
 ### Frontend Stack
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React** | 18.2.0 | UI Framework |
-| **TypeScript** | 5.2.2 | Type Safety |
-| **Vite** | 5.2.0 | Build Tool & Dev Server |
-| **React Router** | 6.x | URL Routing (MPA-style) |
-| **TanStack Query** | 5.51.1 | Server State Management |
-| **Axios** | 1.7.2 | HTTP Client |
-| **Tailwind CSS** | 3.4.4 | Styling Framework |
-| **Leaflet** | 1.9.4 | Interactive Maps |
-| **React Leaflet** | 4.2.1 | Leaflet React Bindings |
-| **Recharts** | 2.12.7 | Data Visualization |
-| **jsPDF** | 2.5.1 | PDF Generation |
+| Technology         | Version | Purpose                 |
+| ------------------ | ------- | ----------------------- |
+| **React**          | 18.2.0  | UI Framework            |
+| **TypeScript**     | 5.2.2   | Type Safety             |
+| **Vite**           | 5.2.0   | Build Tool & Dev Server |
+| **React Router**   | 6.x     | URL Routing (MPA-style) |
+| **TanStack Query** | 5.51.1  | Server State Management |
+| **Axios**          | 1.7.2   | HTTP Client             |
+| **Tailwind CSS**   | 3.4.4   | Styling Framework       |
+| **Leaflet**        | 1.9.4   | Interactive Maps        |
+| **React Leaflet**  | 4.2.1   | Leaflet React Bindings  |
+| **Recharts**       | 2.12.7  | Data Visualization      |
+| **jsPDF**          | 2.5.1   | PDF Generation          |
 
 ### Backend Stack
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Node.js** | 20.x | Runtime Environment |
-| **Express.js** | 4.x | Web Framework |
-| **MySQL2** | 3.x | Database Driver |
-| **bcrypt** | 5.x | Password Hashing |
-| **jsonwebtoken** | 9.x | JWT Authentication |
-| **uuid** | 9.x | Unique ID Generation |
-| **cors** | 2.x | Cross-Origin Resource Sharing |
-| **dotenv** | 16.x | Environment Variables |
+| Technology       | Version | Purpose                       |
+| ---------------- | ------- | ----------------------------- |
+| **Node.js**      | 20.x    | Runtime Environment           |
+| **Express.js**   | 4.x     | Web Framework                 |
+| **MySQL2**       | 3.x     | Database Driver               |
+| **bcrypt**       | 5.x     | Password Hashing              |
+| **jsonwebtoken** | 9.x     | JWT Authentication            |
+| **uuid**         | 9.x     | Unique ID Generation          |
+| **cors**         | 2.x     | Cross-Origin Resource Sharing |
+| **dotenv**       | 16.x    | Environment Variables         |
 
 ### Database
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **MySQL** | 8.0 | Relational Database |
-| **Railway** | Cloud | Database Hosting |
+| Technology  | Version | Purpose             |
+| ----------- | ------- | ------------------- |
+| **MySQL**   | 8.0     | Relational Database |
+| **Railway** | Cloud   | Database Hosting    |
 
 ### AI/ML Services
 
-| Service | Model | Purpose |
-|---------|-------|---------|
+| Service           | Model     | Purpose               |
+| ----------------- | --------- | --------------------- |
 | **Google Gemini** | 2.5 Flash | Region Classification |
 
 ### Deployment
 
-| Platform | Purpose | URL |
-|----------|---------|-----|
-| **Vercel** | Frontend Hosting | TBD |
-| **Railway** | Backend + Database | TBD |
-| **GitHub** | Version Control | github.com/riizalhp/ku-airku |
+| Platform    | Purpose            | URL                          |
+| ----------- | ------------------ | ---------------------------- |
+| **Vercel**  | Frontend Hosting   | TBD                          |
+| **Railway** | Backend + Database | TBD                          |
+| **GitHub**  | Version Control    | github.com/riizalhp/ku-airku |
 
 ---
 
@@ -192,6 +198,7 @@ User Action → React Component → API Service (Axios)
 ### Core Tables
 
 #### 1. **users**
+
 User account management dengan role-based access.
 
 ```sql
@@ -206,11 +213,13 @@ CREATE TABLE users (
 ```
 
 **Indexes:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `email`
 - INDEX: `role`
 
 **Relationships:**
+
 - ONE user → MANY orders (as creator)
 - ONE user → MANY route_plans (as driver)
 - ONE user → MANY visits (as sales)
@@ -218,6 +227,7 @@ CREATE TABLE users (
 ---
 
 #### 2. **stores**
+
 Data toko/pelanggan dengan lokasi geografis.
 
 ```sql
@@ -234,11 +244,13 @@ CREATE TABLE stores (
 ```
 
 **Indexes:**
+
 - PRIMARY KEY: `id`
 - INDEX: `region`
 - SPATIAL INDEX: `lat, lng` (untuk geospatial queries)
 
 **Regions:**
+
 - Bantul
 - Sleman
 - Kota Yogyakarta
@@ -248,6 +260,7 @@ CREATE TABLE stores (
 ---
 
 #### 3. **products**
+
 Katalog produk dengan kapasitas untuk sistem homogen/heterogen.
 
 ```sql
@@ -265,11 +278,13 @@ CREATE TABLE products (
 ```
 
 **Capacity Logic:**
+
 - `capacityUnit`: Digunakan untuk produk homogen (1 jenis produk)
 - `capacityConversionHeterogeneous`: Digunakan untuk produk heterogen (mixed)
 - `reserved_stock`: Stock yang sudah dialokasikan ke pending orders
 
 **Conversion Table:**
+
 ```
 120ml  → 0.57
 240ml  → 1.0 (baseline)
@@ -280,6 +295,7 @@ CREATE TABLE products (
 ---
 
 #### 4. **vehicles**
+
 Data armada pengiriman dengan kapasitas dan status.
 
 ```sql
@@ -294,6 +310,7 @@ CREATE TABLE vehicles (
 ```
 
 **Status Flow:**
+
 ```
 Idle → Sedang Mengirim → Idle
       ↓
@@ -303,6 +320,7 @@ Idle → Sedang Mengirim → Idle
 ---
 
 #### 5. **orders**
+
 Pesanan dari toko dengan multiple items.
 
 ```sql
@@ -328,6 +346,7 @@ CREATE TABLE orders (
 ```
 
 **Order Status Flow:**
+
 ```
 Pending → Routed → Delivering → Delivered
    ↓                    ↓
@@ -337,6 +356,7 @@ Pending → Routed → Delivering → Delivered
 ---
 
 #### 6. **order_items**
+
 Detail item dalam setiap order.
 
 ```sql
@@ -355,6 +375,7 @@ CREATE TABLE order_items (
 ---
 
 #### 7. **shipments** ⭐ NEW
+
 Container untuk grouping orders berdasarkan muatan.
 
 ```sql
@@ -375,6 +396,7 @@ CREATE TABLE shipments (
 ```
 
 **Shipment Workflow:**
+
 ```
 1. Admin creates shipment (unassigned)
 2. Admin adds orders to shipment
@@ -387,6 +409,7 @@ CREATE TABLE shipments (
 ---
 
 #### 8. **route_plans**
+
 Rencana rute pengiriman yang dioptimasi.
 
 ```sql
@@ -407,6 +430,7 @@ CREATE TABLE route_plans (
 ---
 
 #### 9. **route_stops**
+
 Detail pemberhentian dalam setiap route.
 
 ```sql
@@ -429,6 +453,7 @@ CREATE TABLE route_stops (
 ---
 
 #### 10. **visits**
+
 Jadwal kunjungan sales ke toko.
 
 ```sql
@@ -449,6 +474,7 @@ CREATE TABLE visits (
 ---
 
 #### 11. **surveys**
+
 Survey kepuasan pelanggan.
 
 ```sql
@@ -466,6 +492,7 @@ CREATE TABLE surveys (
 ```
 
 **Survey Questions:**
+
 1. Kepuasan terhadap kualitas produk (1-5)
 2. Kepuasan terhadap layanan pengiriman (1-5)
 3. Kepuasan terhadap harga (1-5)
@@ -477,6 +504,7 @@ CREATE TABLE surveys (
 ### Database Indexes Strategy
 
 **High-Traffic Queries:**
+
 ```sql
 -- Orders by date and status
 CREATE INDEX idx_orders_date_status ON orders(order_date, status);
@@ -499,29 +527,29 @@ CREATE INDEX idx_stores_region ON stores(region);
 ┌─────────┐         ┌─────────┐         ┌──────────┐
 │  Users  │────────▶│ Orders  │────────▶│ Products │
 └─────────┘         └─────────┘         └──────────┘
-     │                   │                      
-     │                   │                      
-     ▼                   ▼                      
-┌─────────┐         ┌─────────┐               
-│ Visits  │         │ Stores  │               
-└─────────┘         └─────────┘               
-     │                   │                      
-     ▼                   │                      
-┌─────────┐             │                      
-│ Surveys │             │                      
-└─────────┘             │                      
-                        │                      
-     ┌──────────────────┘                      
-     │                                         
-     ▼                                         
-┌──────────┐        ┌───────────┐             
-│Shipments │───────▶│ Vehicles  │             
-└──────────┘        └───────────┘             
-     │                                         
-     ▼                                         
-┌───────────┐       ┌─────────────┐           
-│RoutePlans │──────▶│ RouteStops  │           
-└───────────┘       └─────────────┘           
+     │                   │
+     │                   │
+     ▼                   ▼
+┌─────────┐         ┌─────────┐
+│ Visits  │         │ Stores  │
+└─────────┘         └─────────┘
+     │                   │
+     ▼                   │
+┌─────────┐             │
+│ Surveys │             │
+└─────────┘             │
+                        │
+     ┌──────────────────┘
+     │
+     ▼
+┌──────────┐        ┌───────────┐
+│Shipments │───────▶│ Vehicles  │
+└──────────┘        └───────────┘
+     │
+     ▼
+┌───────────┐       ┌─────────────┐
+│RoutePlans │──────▶│ RouteStops  │
+└───────────┘       └─────────────┘
 ```
 
 ---
@@ -594,10 +622,11 @@ amdk-airku-backend/
 ### Key Files Explanation
 
 #### **`src/index.js`** - Application Entry Point
+
 ```javascript
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
 
@@ -606,17 +635,17 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/stores', require('./routes/stores'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/vehicles', require('./routes/vehicles'));
-app.use('/api/routes', require('./routes/routes'));
-app.use('/api/shipments', require('./routes/shipments'));
-app.use('/api/visits', require('./routes/visits'));
-app.use('/api/surveys', require('./routes/surveys'));
-app.use('/api/sales-visit-routes', require('./routes/salesVisitRoutes'));
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/users", require("./routes/users"));
+app.use("/api/stores", require("./routes/stores"));
+app.use("/api/products", require("./routes/products"));
+app.use("/api/orders", require("./routes/orders"));
+app.use("/api/vehicles", require("./routes/vehicles"));
+app.use("/api/routes", require("./routes/routes"));
+app.use("/api/shipments", require("./routes/shipments"));
+app.use("/api/visits", require("./routes/visits"));
+app.use("/api/surveys", require("./routes/surveys"));
+app.use("/api/sales-visit-routes", require("./routes/salesVisitRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
@@ -625,8 +654,9 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 ---
 
 #### **`src/config/db.js`** - Database Connection
+
 ```javascript
-const mysql = require('mysql2');
+const mysql = require("mysql2");
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -636,7 +666,7 @@ const pool = mysql.createPool({
   port: process.env.DB_PORT,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
 });
 
 module.exports = pool.promise();
@@ -645,28 +675,29 @@ module.exports = pool.promise();
 ---
 
 #### **`src/middleware/authMiddleware.js`** - JWT Authentication
+
 ```javascript
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const protect = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  
+  const token = req.headers.authorization?.split(" ")[1];
+
   if (!token) {
-    return res.status(401).json({ message: 'Not authorized' });
+    return res.status(401).json({ message: "Not authorized" });
   }
-  
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token invalid' });
+    res.status(401).json({ message: "Token invalid" });
   }
 };
 
 const admin = (req, res, next) => {
-  if (req.user.role !== 'Admin') {
-    return res.status(403).json({ message: 'Admin access required' });
+  if (req.user.role !== "Admin") {
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 };
@@ -744,6 +775,7 @@ amdk-airku-frontend/
 ### Key Components
 
 #### **Admin Components**
+
 - **AdminView**: Layout dengan sidebar navigation dan nested routing
 - **Dashboard**: Overview dengan charts dan metrics
 - **FleetManagement**: ⭐ Shipment-based load management (NEW)
@@ -752,10 +784,12 @@ amdk-airku-frontend/
 - **ProductManagement**: Product CRUD dengan auto capacity calculation
 
 #### **Sales Components**
+
 - **SalesView**: Sales dashboard dengan visit schedule
 - **DataView**: Store dan order information
 
 #### **Driver Components**
+
 - **DriverView**: Delivery route tracking dengan proof of delivery
 
 ---
@@ -765,6 +799,7 @@ amdk-airku-frontend/
 ### 1. **Authentication & Authorization**
 
 #### Login Flow
+
 ```
 User enters email + password
          ↓
@@ -783,25 +818,26 @@ Redirect to role-based dashboard
 
 #### Role-Based Access Control
 
-| Feature | Admin | Sales | Driver |
-|---------|-------|-------|--------|
-| Dashboard | ✅ Full | ✅ Limited | ✅ Limited |
-| User Management | ✅ | ❌ | ❌ |
-| Store Management | ✅ | ✅ View | ❌ |
-| Product Management | ✅ | ❌ | ❌ |
-| Order Management | ✅ | ✅ Create | ❌ |
-| Vehicle Management | ✅ | ❌ | ❌ |
-| Fleet Management | ✅ | ❌ | ❌ |
-| Route Planning | ✅ | ❌ | ✅ View |
-| Visit Schedule | ✅ | ✅ | ❌ |
-| Surveys | ✅ View | ✅ Create | ❌ |
-| Reports | ✅ | ❌ | ❌ |
+| Feature            | Admin   | Sales      | Driver     |
+| ------------------ | ------- | ---------- | ---------- |
+| Dashboard          | ✅ Full | ✅ Limited | ✅ Limited |
+| User Management    | ✅      | ❌         | ❌         |
+| Store Management   | ✅      | ✅ View    | ❌         |
+| Product Management | ✅      | ❌         | ❌         |
+| Order Management   | ✅      | ✅ Create  | ❌         |
+| Vehicle Management | ✅      | ❌         | ❌         |
+| Fleet Management   | ✅      | ❌         | ❌         |
+| Route Planning     | ✅      | ❌         | ✅ View    |
+| Visit Schedule     | ✅      | ✅         | ❌         |
+| Surveys            | ✅ View | ✅ Create  | ❌         |
+| Reports            | ✅      | ❌         | ❌         |
 
 ---
 
 ### 2. **Store Management dengan AI Classification** ⭐
 
 #### Fitur Utama:
+
 - ✅ CRUD toko dengan data lokasi (lat/lng)
 - ✅ Klasifikasi wilayah otomatis dengan AI
 - ✅ Fallback ke rule-based jika AI gagal
@@ -839,28 +875,39 @@ if (!region) {
 ```
 
 #### Bounding Box Coordinates:
+
 ```javascript
 const DIY_REGIONS = {
-  'Kota Yogyakarta': {
-    minLat: -7.8347, maxLat: -7.7484,
-    minLng: 110.3264, maxLng: 110.4264
+  "Kota Yogyakarta": {
+    minLat: -7.8347,
+    maxLat: -7.7484,
+    minLng: 110.3264,
+    maxLng: 110.4264,
   },
-  'Sleman': {
-    minLat: -7.8, maxLat: -7.5,
-    minLng: 110.25, maxLng: 110.55
+  Sleman: {
+    minLat: -7.8,
+    maxLat: -7.5,
+    minLng: 110.25,
+    maxLng: 110.55,
   },
-  'Bantul': {
-    minLat: -8.1, maxLat: -7.8,
-    minLng: 110.2, maxLng: 110.5
+  Bantul: {
+    minLat: -8.1,
+    maxLat: -7.8,
+    minLng: 110.2,
+    maxLng: 110.5,
   },
-  'Kulon Progo': {
-    minLat: -7.95, maxLat: -7.6,
-    minLng: 110.0, maxLng: 110.3
+  "Kulon Progo": {
+    minLat: -7.95,
+    maxLat: -7.6,
+    minLng: 110.0,
+    maxLng: 110.3,
   },
-  'Gunung Kidul': {
-    minLat: -8.2, maxLat: -7.7,
-    minLng: 110.4, maxLng: 110.9
-  }
+  "Gunung Kidul": {
+    minLat: -8.2,
+    maxLat: -7.7,
+    minLng: 110.4,
+    maxLng: 110.9,
+  },
 };
 ```
 
@@ -869,14 +916,17 @@ const DIY_REGIONS = {
 ### 3. **Shipment-Based Load Management** ⭐ MAJOR FEATURE
 
 #### Konsep:
+
 Sistem berpindah dari **vehicle-centric** ke **shipment-based** management.
 
 **Sebelum:**
+
 ```
 Order → Assigned to Vehicle → Route dibuat
 ```
 
 **Sesudah:**
+
 ```
 Admin creates Shipment → Add Orders → Assign Driver+Vehicle → Auto-generate Route
 ```
@@ -884,6 +934,7 @@ Admin creates Shipment → Add Orders → Assign Driver+Vehicle → Auto-generat
 #### Workflow:
 
 **Step 1: Create Shipment**
+
 ```javascript
 POST /api/shipments
 {
@@ -894,6 +945,7 @@ POST /api/shipments
 ```
 
 **Step 2: Add Orders to Shipment**
+
 ```javascript
 POST /api/shipments/:id/orders
 {
@@ -902,6 +954,7 @@ POST /api/shipments/:id/orders
 ```
 
 **Step 3: Assign Driver + Vehicle**
+
 ```javascript
 POST /api/shipments/:id/assign
 {
@@ -911,12 +964,14 @@ POST /api/shipments/:id/assign
 ```
 
 **Step 4: System Auto-generates Route**
+
 - System calls Clarke-Wright Algorithm
 - Creates optimized route
 - Links route to shipment
 - Updates shipment status to "assigned"
 
 #### Benefits:
+
 - ✅ Better load planning
 - ✅ Multiple orders per shipment
 - ✅ Clear separation of concerns
@@ -930,16 +985,19 @@ POST /api/shipments/:id/assign
 #### Homogen vs Heterogen
 
 **Homogen** (1 jenis produk):
+
 - Menggunakan `capacityUnit = 1.0`
 - Calculation: `quantity × 1.0`
 
 **Heterogen** (multiple produk):
+
 - Menggunakan `capacityConversionHeterogeneous`
 - Calculation: `quantity × conversion_rate`
 
 #### Example:
 
 **Order A (Homogen):**
+
 ```
 50 unit Air Galon 19L
 capacityUnit = 1.0
@@ -947,6 +1005,7 @@ Total = 50 × 1.0 = 50 unit
 ```
 
 **Order B (Heterogen):**
+
 ```
 30 unit Air Madu 240ml (conversion = 1.0)
 20 unit Air Galon 19L (conversion = 3.3)
@@ -954,6 +1013,7 @@ Total = (30 × 1.0) + (20 × 3.3) = 96 unit
 ```
 
 #### Validation:
+
 ```javascript
 // Check if order fits in vehicle
 const result = await validateMultipleOrdersCapacity(
@@ -983,17 +1043,20 @@ const result = await validateMultipleOrdersCapacity(
 **Step-by-step:**
 
 1. **Calculate Savings Matrix**
+
 ```
 For each pair of customers (i, j):
   savings[i][j] = distance(depot, i) + distance(depot, j) - distance(i, j)
 ```
 
 2. **Sort Savings (Descending)**
+
 ```
 Sorted savings from largest to smallest
 ```
 
 3. **Merge Routes**
+
 ```
 For each saving:
   If merge doesn't exceed vehicle capacity:
@@ -1001,6 +1064,7 @@ For each saving:
 ```
 
 4. **Output Optimized Routes**
+
 ```
 [Route 1]: Depot → Store A → Store B → Store C → Depot
 [Route 2]: Depot → Store D → Store E → Depot
@@ -1013,12 +1077,15 @@ function getDistance(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth radius in km
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 ```
@@ -1028,6 +1095,7 @@ function getDistance(lat1, lng1, lat2, lng2) {
 ### 6. **Real-Time Tracking**
 
 #### Driver App Features:
+
 - ✅ View assigned route with map
 - ✅ Navigate stop by stop
 - ✅ Mark delivery as completed/failed
@@ -1035,6 +1103,7 @@ function getDistance(lat1, lng1, lat2, lng2) {
 - ✅ Add delivery notes
 
 #### Status Updates:
+
 ```
 Pending → In Progress → Completed
             ↓
@@ -1046,6 +1115,7 @@ Pending → In Progress → Completed
 ### 7. **Sales Visit Management**
 
 #### Visit Workflow:
+
 1. Admin creates visit schedule
 2. Sales receives notification
 3. Sales navigates to store
@@ -1054,6 +1124,7 @@ Pending → In Progress → Completed
 6. Sales fills survey
 
 #### Survey Integration:
+
 - Kepuasan produk (1-5)
 - Kepuasan layanan (1-5)
 - Kepuasan harga (1-5)
@@ -1065,6 +1136,7 @@ Pending → In Progress → Completed
 ### 8. **Analytics & Reporting**
 
 #### Dashboard Metrics:
+
 - Total orders (by status)
 - Total revenue (daily/monthly)
 - Active routes
@@ -1075,6 +1147,7 @@ Pending → In Progress → Completed
 - Top products
 
 #### Reports Available:
+
 - Delivery performance report
 - Sales performance report
 - Survey analysis report
@@ -1086,12 +1159,14 @@ Pending → In Progress → Completed
 ## 🔌 API Documentation
 
 ### Base URL
+
 ```
 Development: http://localhost:5000/api
 Production: https://your-backend.railway.app/api
 ```
 
 ### Authentication Header
+
 ```
 Authorization: Bearer <JWT_TOKEN>
 ```
@@ -1101,9 +1176,11 @@ Authorization: Bearer <JWT_TOKEN>
 ### **Auth Endpoints**
 
 #### POST `/auth/register`
+
 Register new user.
 
 **Request:**
+
 ```json
 {
   "name": "John Doe",
@@ -1114,6 +1191,7 @@ Register new user.
 ```
 
 **Response:**
+
 ```json
 {
   "message": "User registered successfully",
@@ -1124,9 +1202,11 @@ Register new user.
 ---
 
 #### POST `/auth/login`
+
 Login user.
 
 **Request:**
+
 ```json
 {
   "email": "john@example.com",
@@ -1135,6 +1215,7 @@ Login user.
 ```
 
 **Response:**
+
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
@@ -1152,9 +1233,11 @@ Login user.
 ### **Store Endpoints**
 
 #### GET `/stores`
+
 Get all stores.
 
 **Response:**
+
 ```json
 [
   {
@@ -1172,9 +1255,11 @@ Get all stores.
 ---
 
 #### POST `/stores`
+
 Create store with AI classification.
 
 **Request:**
+
 ```json
 {
   "name": "Toko Berkah",
@@ -1186,6 +1271,7 @@ Create store with AI classification.
 ```
 
 **Response:**
+
 ```json
 {
   "id": "uuid-123",
@@ -1200,9 +1286,11 @@ Create store with AI classification.
 ### **Product Endpoints**
 
 #### GET `/products`
+
 Get all products.
 
 **Response:**
+
 ```json
 [
   {
@@ -1221,9 +1309,11 @@ Get all products.
 ---
 
 #### POST `/products`
+
 Create product.
 
 **Request:**
+
 ```json
 {
   "sku": "AG-19L",
@@ -1240,9 +1330,11 @@ Create product.
 ### **Order Endpoints**
 
 #### GET `/orders`
+
 Get all orders.
 
 **Response:**
+
 ```json
 [
   {
@@ -1268,9 +1360,11 @@ Get all orders.
 ---
 
 #### POST `/orders`
+
 Create order.
 
 **Request:**
+
 ```json
 {
   "storeId": "store-uuid",
@@ -1288,9 +1382,11 @@ Create order.
 ---
 
 #### POST `/orders/validate-multiple-capacity`
+
 Validate if multiple orders fit in vehicle.
 
 **Request:**
+
 ```json
 {
   "orderIds": ["order-1", "order-2"],
@@ -1299,6 +1395,7 @@ Validate if multiple orders fit in vehicle.
 ```
 
 **Response:**
+
 ```json
 {
   "canFit": true,
@@ -1331,13 +1428,16 @@ Validate if multiple orders fit in vehicle.
 ### **Shipment Endpoints** ⭐
 
 #### GET `/shipments`
+
 Get all shipments (with optional filters).
 
 **Query Parameters:**
+
 - `date`: Filter by date (YYYY-MM-DD)
 - `status`: Filter by status
 
 **Response:**
+
 ```json
 [
   {
@@ -1364,9 +1464,11 @@ Get all shipments (with optional filters).
 ---
 
 #### POST `/shipments`
+
 Create shipment.
 
 **Request:**
+
 ```json
 {
   "name": "Pengiriman Bantul 29 Okt",
@@ -1378,9 +1480,11 @@ Create shipment.
 ---
 
 #### POST `/shipments/:id/orders`
+
 Add order to shipment.
 
 **Request:**
+
 ```json
 {
   "orderId": "order-uuid"
@@ -1390,9 +1494,11 @@ Add order to shipment.
 ---
 
 #### POST `/shipments/:id/assign`
+
 Assign driver + vehicle, auto-generate route.
 
 **Request:**
+
 ```json
 {
   "driverId": "user-uuid",
@@ -1401,6 +1507,7 @@ Assign driver + vehicle, auto-generate route.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -1417,11 +1524,13 @@ Assign driver + vehicle, auto-generate route.
 ---
 
 #### DELETE `/shipments/:id/orders/:orderId`
+
 Remove order from shipment.
 
 ---
 
 #### DELETE `/shipments/:id`
+
 Delete shipment (only if unassigned).
 
 ---
@@ -1429,9 +1538,11 @@ Delete shipment (only if unassigned).
 ### **Route Endpoints**
 
 #### GET `/routes`
+
 Get all route plans.
 
 **Query Parameters:**
+
 - `driverId`: Filter by driver
 - `date`: Filter by date
 - `vehicleId`: Filter by vehicle
@@ -1439,9 +1550,11 @@ Get all route plans.
 ---
 
 #### POST `/routes`
+
 Create route (auto-optimization).
 
 **Request:**
+
 ```json
 {
   "driverI
@@ -1458,14 +1571,17 @@ d": "user-uuid",
 ### **Vehicle Endpoints**
 
 #### GET `/vehicles`
+
 Get all vehicles.
 
 ---
 
 #### POST `/vehicles`
+
 Create vehicle.
 
 **Request:**
+
 ```json
 {
   "plateNumber": "B 1234 CD",
@@ -1479,14 +1595,17 @@ Create vehicle.
 ### **Visit Endpoints**
 
 #### GET `/visits`
+
 Get all visits.
 
 ---
 
 #### POST `/visits`
+
 Create visit schedule.
 
 **Request:**
+
 ```json
 {
   "storeId": "store-uuid",
@@ -1498,9 +1617,11 @@ Create visit schedule.
 ---
 
 #### PUT `/visits/:id`
+
 Update visit status.
 
 **Request:**
+
 ```json
 {
   "status": "Completed",
@@ -1514,9 +1635,11 @@ Update visit status.
 ### **Survey Endpoints**
 
 #### POST `/surveys`
+
 Submit survey.
 
 **Request:**
+
 ```json
 {
   "visitId": "visit-uuid",
@@ -1535,6 +1658,7 @@ Submit survey.
 ## 🚀 Deployment Guide
 
 ### Prerequisites
+
 - Node.js 20.x or higher
 - MySQL 8.0
 - Git
@@ -1546,6 +1670,7 @@ Submit survey.
 ### Backend Deployment (Railway)
 
 #### Step 1: Prepare Database
+
 1. Create MySQL database on Railway
 2. Get connection credentials:
    ```
@@ -1557,6 +1682,7 @@ Submit survey.
    ```
 
 #### Step 2: Run Migrations
+
 ```bash
 # Connect to Railway MySQL
 mysql -h metro.proxy.rlwy.net -u root -p --port 42358 railway
@@ -1568,6 +1694,7 @@ SOURCE migrations/allow_null_driver_vehicle_in_routes.sql;
 ```
 
 #### Step 3: Deploy Backend
+
 1. Push code to GitHub
 2. Connect Railway to GitHub repo
 3. Set environment variables:
@@ -1588,21 +1715,23 @@ SOURCE migrations/allow_null_driver_vehicle_in_routes.sql;
 ### Frontend Deployment (Vercel)
 
 #### Step 1: Configure Environment
+
 Create `.env.production`:
+
 ```
 VITE_API_URL=https://your-backend.railway.app/api
 ```
 
 #### Step 2: Add vercel.json
+
 ```json
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
 ```
 
 #### Step 3: Deploy
+
 ```bash
 cd amdk-airku-frontend
 vercel --prod
@@ -1615,6 +1744,7 @@ Or connect GitHub repo to Vercel for auto-deploy.
 ### Environment Variables Summary
 
 **Backend (.env):**
+
 ```
 DB_HOST=metro.proxy.rlwy.net
 DB_PORT=42358
@@ -1628,6 +1758,7 @@ NODE_ENV=production
 ```
 
 **Frontend (.env.production):**
+
 ```
 VITE_API_URL=https://your-backend.railway.app/api
 ```
@@ -1637,28 +1768,30 @@ VITE_API_URL=https://your-backend.railway.app/api
 ## ⚙️ Configuration
 
 ### CORS Configuration
+
 ```javascript
 // Backend: src/index.js
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://your-frontend.vercel.app'
-  ],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://your-frontend.vercel.app"],
+    credentials: true,
+  })
+);
 ```
 
 ### JWT Configuration
+
 ```javascript
 // Token expiry: 24 hours
 const token = jwt.sign(
   { id: user.id, email: user.email, role: user.role },
   process.env.JWT_SECRET,
-  { expiresIn: '24h' }
+  { expiresIn: "24h" }
 );
 ```
 
 ### Database Connection Pool
+
 ```javascript
 {
   connectionLimit: 10,
@@ -1674,6 +1807,7 @@ const token = jwt.sign(
 ### Manual Testing Checklist
 
 #### Authentication
+
 - [ ] Register new user
 - [ ] Login with valid credentials
 - [ ] Login with invalid credentials
@@ -1681,6 +1815,7 @@ const token = jwt.sign(
 - [ ] Token expiry handling
 
 #### Store Management
+
 - [ ] Create store with AI classification
 - [ ] Create store with coordinates (fallback)
 - [ ] Update store information
@@ -1688,6 +1823,7 @@ const token = jwt.sign(
 - [ ] View stores on map
 
 #### Order Management
+
 - [ ] Create order with single product
 - [ ] Create order with multiple products
 - [ ] Validate stock availability
@@ -1696,6 +1832,7 @@ const token = jwt.sign(
 - [ ] Delete pending order
 
 #### Shipment Management
+
 - [ ] Create shipment
 - [ ] Add orders to shipment
 - [ ] Remove orders from shipment
@@ -1705,6 +1842,7 @@ const token = jwt.sign(
 - [ ] Delete unassigned shipment
 
 #### Route Planning
+
 - [ ] Generate optimized route
 - [ ] View route on map
 - [ ] Update stop status
@@ -1712,6 +1850,7 @@ const token = jwt.sign(
 - [ ] Mark delivery as failed
 
 #### Capacity System
+
 - [ ] Validate homogeneous order
 - [ ] Validate heterogeneous order
 - [ ] Check overload prevention
@@ -1722,6 +1861,7 @@ const token = jwt.sign(
 ### API Testing with Postman
 
 **Collection Structure:**
+
 ```
 KU AIRKU API/
 ├── Auth/
@@ -1756,9 +1896,11 @@ KU AIRKU API/
 ### Common Issues
 
 #### 1. Database Connection Failed
+
 **Error:** `ECONNREFUSED` or `Access denied`
 
 **Solution:**
+
 - Check Railway database status
 - Verify connection credentials in `.env`
 - Check if IP is whitelisted (Railway allows all by default)
@@ -1767,9 +1909,11 @@ KU AIRKU API/
 ---
 
 #### 2. JWT Token Invalid
+
 **Error:** `Token invalid` or `Not authorized`
 
 **Solution:**
+
 - Check if `JWT_SECRET` is set in backend
 - Verify token is being sent in `Authorization` header
 - Check token expiry (24h default)
@@ -1778,9 +1922,11 @@ KU AIRKU API/
 ---
 
 #### 3. CORS Error
+
 **Error:** `CORS policy: No 'Access-Control-Allow-Origin' header`
 
 **Solution:**
+
 - Add frontend URL to CORS whitelist in backend
 - Check if credentials are being sent
 - Verify API URL in frontend `.env`
@@ -1788,9 +1934,11 @@ KU AIRKU API/
 ---
 
 #### 4. AI Classification Failed
+
 **Error:** `Region classification failed`
 
 **Solution:**
+
 - Check Gemini API key validity
 - Verify API quota not exceeded
 - System auto-falls back to bounding box classification
@@ -1799,9 +1947,11 @@ KU AIRKU API/
 ---
 
 #### 5. Route Optimization Failed
+
 **Error:** `Failed to generate routes`
 
 **Solution:**
+
 - Check if all orders have valid coordinates
 - Verify depot location is set correctly
 - Check vehicle capacity vs order demands
@@ -1810,9 +1960,11 @@ KU AIRKU API/
 ---
 
 #### 6. Stock Calculation Mismatch
+
 **Issue:** Reserved stock not updating correctly
 
 **Solution:**
+
 - Check database transactions are committed
 - Verify `reservedStock` field in products table
 - Test order creation/deletion flow
@@ -1825,36 +1977,42 @@ KU AIRKU API/
 ### Phase 2 Features (Q1 2026)
 
 #### 1. Mobile Apps
+
 - [ ] React Native app for drivers
 - [ ] Offline mode with sync
 - [ ] Push notifications
 - [ ] GPS tracking in real-time
 
 #### 2. Advanced Analytics
+
 - [ ] Predictive analytics for demand forecasting
 - [ ] Machine learning for route optimization
 - [ ] Customer behavior analysis
 - [ ] Seasonal trends visualization
 
 #### 3. Integration
+
 - [ ] WhatsApp notification integration
 - [ ] Payment gateway integration
 - [ ] E-invoice generation
 - [ ] Third-party logistics integration
 
 #### 4. Performance
+
 - [ ] GraphQL API implementation
 - [ ] Redis caching layer
 - [ ] CDN for static assets
 - [ ] Database query optimization
 
 #### 5. Security
+
 - [ ] Two-factor authentication
 - [ ] Rate limiting
 - [ ] API key management
 - [ ] Audit logging
 
 #### 6. User Experience
+
 - [ ] Dark mode
 - [ ] Multi-language support (ID/EN)
 - [ ] Progressive Web App (PWA)
@@ -1866,16 +2024,17 @@ KU AIRKU API/
 
 ### Load Testing Results
 
-| Metric | Value | Notes |
-|--------|-------|-------|
-| **Concurrent Users** | 100 | Tested with Artillery |
-| **Response Time (avg)** | 120ms | P95: 350ms |
-| **Throughput** | 500 req/s | Peak performance |
-| **Database Queries** | <50ms | With indexes |
-| **Route Calculation** | ~2s | For 20 stops |
-| **AI Classification** | ~1.5s | Gemini API latency |
+| Metric                  | Value     | Notes                 |
+| ----------------------- | --------- | --------------------- |
+| **Concurrent Users**    | 100       | Tested with Artillery |
+| **Response Time (avg)** | 120ms     | P95: 350ms            |
+| **Throughput**          | 500 req/s | Peak performance      |
+| **Database Queries**    | <50ms     | With indexes          |
+| **Route Calculation**   | ~2s       | For 20 stops          |
+| **AI Classification**   | ~1.5s     | Gemini API latency    |
 
 ### Optimization Tips
+
 - ✅ Database indexes on frequently queried fields
 - ✅ React Query caching (5 min default)
 - ✅ Connection pooling (max 10)
@@ -1887,6 +2046,7 @@ KU AIRKU API/
 ## 📝 Code Standards
 
 ### Backend (JavaScript/Node.js)
+
 - Use `async/await` instead of callbacks
 - Always use try-catch for error handling
 - Validate inputs before database operations
@@ -1895,6 +2055,7 @@ KU AIRKU API/
 - Comment complex business logic
 
 ### Frontend (TypeScript/React)
+
 - Use TypeScript for type safety
 - Functional components with hooks
 - Use React Query for server state
@@ -1903,6 +2064,7 @@ KU AIRKU API/
 - Use TailwindCSS for styling
 
 ### Database
+
 - Always use foreign keys
 - Create indexes for frequently queried columns
 - Use transactions for multiple related operations
@@ -1914,6 +2076,7 @@ KU AIRKU API/
 ## 🤝 Contributing
 
 ### Git Workflow
+
 ```bash
 # 1. Create feature branch
 git checkout -b feature/new-feature
@@ -1931,6 +2094,7 @@ git push origin feature/new-feature
 ```
 
 ### Commit Message Convention
+
 ```
 feat: Add new feature
 fix: Fix bug in calculation
@@ -1946,11 +2110,13 @@ chore: Update dependencies
 ## 📞 Support & Contact
 
 ### Developer
+
 **Name:** Riizal HP  
 **Email:** riizalhp@example.com  
 **GitHub:** github.com/riizalhp
 
 ### Organization
+
 **PDAM Tirta Binangun**  
 Kabupaten Kulon Progo  
 Daerah Istimewa Yogyakarta
@@ -1967,6 +2133,7 @@ All rights reserved © 2025 PDAM Tirta Binangun
 ## 🎓 Learning Resources
 
 ### Technologies Used
+
 - [Node.js Documentation](https://nodejs.org/docs/)
 - [Express.js Guide](https://expressjs.com/)
 - [React Documentation](https://react.dev/)
@@ -1977,6 +2144,7 @@ All rights reserved © 2025 PDAM Tirta Binangun
 - [MySQL Documentation](https://dev.mysql.com/doc/)
 
 ### Algorithms
+
 - [Clarke-Wright Savings Algorithm](https://en.wikipedia.org/wiki/Clarke%E2%80%93Wright_algorithm)
 - [Haversine Formula](https://en.wikipedia.org/wiki/Haversine_formula)
 - [Vehicle Routing Problem](https://en.wikipedia.org/wiki/Vehicle_routing_problem)
@@ -1986,6 +2154,7 @@ All rights reserved © 2025 PDAM Tirta Binangun
 ## 📈 Version History
 
 ### v2.0 (October 29, 2025) - Current
+
 - ✅ Shipment-based load management
 - ✅ URL routing implementation
 - ✅ Homogeneous/Heterogeneous capacity system
@@ -1994,6 +2163,7 @@ All rights reserved © 2025 PDAM Tirta Binangun
 - ✅ Comprehensive documentation
 
 ### v1.0 (September 2025)
+
 - ✅ Initial release
 - ✅ Basic CRUD operations
 - ✅ Authentication & authorization
@@ -2019,4 +2189,4 @@ All rights reserved © 2025 PDAM Tirta Binangun
 
 ---
 
-*This documentation is comprehensive for knowledge transfer to new developers or team members. For specific implementation details, refer to inline code comments and related documentation files.*
+_This documentation is comprehensive for knowledge transfer to new developers or team members. For specific implementation details, refer to inline code comments and related documentation files._
