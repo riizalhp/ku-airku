@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ICONS } from '../../constants';
 import { Dashboard } from './Dashboard';
-import { RoutePlanning } from './RoutePlanning';
 import { UserManagement } from './UserManagement';
 import { StoreManagement } from './StoreManagement';
 import { ProductManagement } from './ProductManagement';
@@ -14,7 +13,7 @@ import { ReportsView } from './ReportsView';
 import { useAppContext } from '../../hooks/useAppContext';
 import { TripHistory } from './TripHistory';
 
-type AdminPage = 'dashboard' | 'users' | 'stores' | 'products' | 'fleet' | 'vehicles' | 'orders' | 'routePlanning' | 'schedule' | 'surveys' | 'reports' | 'tripHistory';
+type AdminPage = 'dashboard' | 'users' | 'stores' | 'products' | 'fleet' | 'vehicles' | 'orders' | 'schedule' | 'surveys' | 'reports' | 'tripHistory';
 
 // Menu items are ordered based on the admin's typical workflow.
 const navItems: { id: AdminPage; label: string; icon: React.ReactNode }[] = [
@@ -25,8 +24,8 @@ const navItems: { id: AdminPage; label: string; icon: React.ReactNode }[] = [
     
     // --- Group 2: Daily Operations ---
     // Core, high-frequency operational tasks.
-    { id: 'routePlanning', label: 'Perencanaan Rute', icon: <ICONS.route /> },
-    { id: 'fleet', label: 'Pantau Muatan', icon: <ICONS.orders /> }, // Monitor vehicle loads and status
+    // REMOVED: routePlanning - Functionality moved to FleetManagement
+    { id: 'fleet', label: 'Manajemen Muatan & Armada', icon: <ICONS.fleet /> }, // Load management with assignment
     { id: 'tripHistory', label: 'Riwayat Perjalanan', icon: <ICONS.history /> },
     
     // --- Group 3: Sales & Data Entry ---
@@ -55,8 +54,6 @@ export const AdminView: React.FC = () => {
                 return <Dashboard />;
             case 'reports':
                 return <ReportsView />;
-            case 'routePlanning':
-                return <RoutePlanning />;
             case 'tripHistory':
                 return <TripHistory />;
             case 'users':

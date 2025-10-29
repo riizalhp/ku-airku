@@ -38,7 +38,7 @@ export const RoutePlanning: React.FC = () => {
     // --- Delivery Planning ---
     const [deliveryForm, setDeliveryForm] = useState({ date: new Date().toISOString().split('T')[0] });
     const [assignmentForm, setAssignmentForm] = useState({ vehicleId: '', driverId: '' });
-    
+
     const createDeliveryMutation = useMutation({
         mutationFn: createDeliveryRoute,
         onSuccess: (data) => {
@@ -117,7 +117,7 @@ export const RoutePlanning: React.FC = () => {
 
     // --- Sales Visit Planning ---
     const [salesForm, setSalesForm] = useState({ salesPersonId: '', visitDate: new Date().toISOString().split('T')[0] });
-    
+
     const createSalesMutation = useMutation({
         mutationFn: createSalesRoute,
         onSuccess: (data) => {
@@ -127,8 +127,8 @@ export const RoutePlanning: React.FC = () => {
         },
         onError: (err: any) => setModalError(err.response?.data?.message || 'Gagal membuat rute kunjungan.'),
     });
-    
-     const deleteSalesMutation = useMutation({
+
+    const deleteSalesMutation = useMutation({
         mutationFn: deleteSalesRoute,
         onSuccess: () => {
             alert('Rencana kunjungan berhasil dihapus.');
@@ -157,7 +157,7 @@ export const RoutePlanning: React.FC = () => {
     // Memos
     const availableDrivers = useMemo(() => users.filter(u => u.role === Role.DRIVER), [users]);
     const availableSales = useMemo(() => users.filter(u => u.role === Role.SALES), [users]);
-    
+
     // Group routes by assignment status
     const routesByStatus = useMemo(() => {
         const grouped: Record<string, RoutePlan[]> = {
@@ -191,11 +191,11 @@ export const RoutePlanning: React.FC = () => {
         };
         return badges[status as keyof typeof badges] || badges.unassigned;
     };
-    
+
     const sortedSalesRoutes = useMemo(() => {
         const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
 
-        return [...salesRoutes].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(route => {
+        return [...salesRoutes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(route => {
             // Calculate distances for sales visit routes
             const stopsWithDistances = route.stops.map((stop, index, array) => {
                 const prevLocation = index === 0 ? depotLocation : array[index - 1].location;
@@ -211,7 +211,7 @@ export const RoutePlanning: React.FC = () => {
         <div className="p-8 space-y-6">
             <h1 className="text-3xl font-bold text-brand-dark">Perencanaan Rute</h1>
             <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-6"><button onClick={() => setActiveTab('delivery')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'delivery' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Rute Pengiriman</button><button onClick={() => setActiveTab('salesVisit')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'salesVisit' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Rute Kunjungan Sales</button></nav></div>
-            
+
             <div className="mt-6">
                 {activeTab === 'delivery' ? (
                     <div className="space-y-6">
@@ -271,21 +271,21 @@ export const RoutePlanning: React.FC = () => {
                                                             <span className={`px-3 py-1 text-sm font-semibold rounded-full ${getAssignmentStatusBadge(route.assignmentStatus).class}`}>
                                                                 {getAssignmentStatusBadge(route.assignmentStatus).text}
                                                             </span>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleOpenAssignModal(route)}
                                                                 className="bg-brand-primary text-white px-4 py-2 rounded-lg hover:bg-brand-dark transition text-sm font-semibold"
                                                             >
                                                                 Assign Driver & Armada
                                                             </button>
-                                                            <button 
-                                                                onClick={() => handleDeleteDeliveryTrip(route.id)} 
+                                                            <button
+                                                                onClick={() => handleDeleteDeliveryTrip(route.id)}
                                                                 className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition text-sm font-semibold"
                                                             >
                                                                 Hapus Rute
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <button 
+                                                    <button
                                                         onClick={() => toggleRouteExpansion(route.id)}
                                                         className="text-sm font-semibold text-gray-600 hover:underline mt-2"
                                                     >
@@ -354,20 +354,20 @@ export const RoutePlanning: React.FC = () => {
                                                                         {vehicle.status}
                                                                     </span>
                                                                 )}
-                                                                <button 
+                                                                <button
                                                                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-semibold"
                                                                 >
                                                                     🚚 Berangkatkan
                                                                 </button>
-                                                                <button 
-                                                                    onClick={() => handleDeleteDeliveryTrip(route.id)} 
+                                                                <button
+                                                                    onClick={() => handleDeleteDeliveryTrip(route.id)}
                                                                     className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition text-sm font-semibold"
                                                                 >
                                                                     Batalkan
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                        <button 
+                                                        <button
                                                             onClick={() => toggleRouteExpansion(route.id)}
                                                             className="text-sm font-semibold text-gray-600 hover:underline mt-2"
                                                         >
@@ -470,16 +470,17 @@ export const RoutePlanning: React.FC = () => {
                                                                 const prevLocation = stopIndex === 0 ? depotLocation : array[stopIndex - 1].location;
                                                                 const distance = getDistance(prevLocation, stop.location);
                                                                 return (
-                                                                <div key={stop.visitId} className="relative pl-6">
-                                                                    <div className="absolute left-0 top-1 w-4 h-4 bg-brand-secondary text-white text-xs rounded-full flex items-center justify-center font-mono">{stopIndex + 1}</div>
-                                                                    <p className="font-semibold text-sm">{stop.storeName}</p>
-                                                                    <p className="text-xs text-gray-500">{stop.address}</p>
-                                                                    <p className="text-xs text-gray-600 mt-1 font-medium">Tujuan: {stop.purpose}</p>
-                                                                    {distance !== undefined && (
-                                                                        <p className="text-xs text-gray-600 mt-1">Jarak dari titik sebelumnya: {distance.toFixed(2)} km</p>
-                                                                    )}
-                                                                </div>
-                                                            );})}
+                                                                    <div key={stop.visitId} className="relative pl-6">
+                                                                        <div className="absolute left-0 top-1 w-4 h-4 bg-brand-secondary text-white text-xs rounded-full flex items-center justify-center font-mono">{stopIndex + 1}</div>
+                                                                        <p className="font-semibold text-sm">{stop.storeName}</p>
+                                                                        <p className="text-xs text-gray-500">{stop.address}</p>
+                                                                        <p className="text-xs text-gray-600 mt-1 font-medium">Tujuan: {stop.purpose}</p>
+                                                                        {distance !== undefined && (
+                                                                            <p className="text-xs text-gray-600 mt-1">Jarak dari titik sebelumnya: {distance.toFixed(2)} km</p>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </div>
@@ -499,29 +500,29 @@ export const RoutePlanning: React.FC = () => {
                     <div className="space-y-4">
                         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
                             <p className="text-sm text-gray-700">
-                                <strong>ℹ️ Info:</strong> Sistem akan membuat rute optimal dari pesanan <strong>Pending</strong> untuk tanggal yang dipilih. 
+                                <strong>ℹ️ Info:</strong> Sistem akan membuat rute optimal dari pesanan <strong>Pending</strong> untuk tanggal yang dipilih.
                                 Driver dan armada bisa di-assign nanti sebelum rute diberangkatkan.
                             </p>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold mb-1">Tanggal Pengiriman</label>
-                            <input 
-                                type="date" 
-                                value={deliveryForm.date} 
-                                onChange={e => setDeliveryForm(f => ({...f, date: e.target.value}))} 
+                            <input
+                                type="date"
+                                value={deliveryForm.date}
+                                onChange={e => setDeliveryForm(f => ({ ...f, date: e.target.value }))}
                                 className="w-full p-2 border rounded mt-1"
                             />
                         </div>
                         <div className="flex justify-end pt-4 gap-2">
-                            <button 
-                                onClick={() => setIsModalOpen(false)} 
+                            <button
+                                onClick={() => setIsModalOpen(false)}
                                 className="bg-gray-200 py-2 px-4 rounded-lg hover:bg-gray-300 transition"
                             >
                                 Batal
                             </button>
-                            <button 
-                                onClick={handleCreateDeliveryPlan} 
-                                disabled={createDeliveryMutation.isPending} 
+                            <button
+                                onClick={handleCreateDeliveryPlan}
+                                disabled={createDeliveryMutation.isPending}
                                 className="bg-brand-primary text-white py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark transition"
                             >
                                 {createDeliveryMutation.isPending ? 'Membuat Rute...' : 'Buat Rute'}
@@ -529,18 +530,18 @@ export const RoutePlanning: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                     <div className="space-y-4">
-                        <div><label>Sales</label><select value={salesForm.salesPersonId} onChange={e => setSalesForm(f => ({...f, salesPersonId: e.target.value}))} className="w-full p-2 border rounded mt-1"><option value="" disabled>-- Pilih --</option>{availableSales.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                        <div><label>Tanggal</label><input type="date" value={salesForm.visitDate} onChange={e => setSalesForm(f => ({...f, visitDate: e.target.value}))} className="w-full p-2 border rounded mt-1"/></div>
+                    <div className="space-y-4">
+                        <div><label>Sales</label><select value={salesForm.salesPersonId} onChange={e => setSalesForm(f => ({ ...f, salesPersonId: e.target.value }))} className="w-full p-2 border rounded mt-1"><option value="" disabled>-- Pilih --</option>{availableSales.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                        <div><label>Tanggal</label><input type="date" value={salesForm.visitDate} onChange={e => setSalesForm(f => ({ ...f, visitDate: e.target.value }))} className="w-full p-2 border rounded mt-1" /></div>
                         <div className="flex justify-end pt-4"><button onClick={() => setIsModalOpen(false)} className="bg-gray-200 py-2 px-4 rounded-lg mr-2">Batal</button><button onClick={handleCreateSalesPlan} disabled={createSalesMutation.isPending} className="bg-brand-primary text-white py-2 px-4 rounded-lg disabled:bg-gray-400">{createSalesMutation.isPending ? 'Membuat...' : 'Hasilkan Rute'}</button></div>
                     </div>
                 )}
             </Modal>
 
             {/* Modal for Assigning Driver & Vehicle */}
-            <Modal 
-                title="Assign Driver & Armada" 
-                isOpen={isAssignModalOpen} 
+            <Modal
+                title="Assign Driver & Armada"
+                isOpen={isAssignModalOpen}
                 onClose={() => {
                     setIsAssignModalOpen(false);
                     setSelectedRouteForAssignment(null);
@@ -564,9 +565,9 @@ export const RoutePlanning: React.FC = () => {
 
                         <div>
                             <label className="block text-sm font-semibold mb-1">Pilih Armada</label>
-                            <select 
-                                value={assignmentForm.vehicleId} 
-                                onChange={e => setAssignmentForm(f => ({...f, vehicleId: e.target.value}))} 
+                            <select
+                                value={assignmentForm.vehicleId}
+                                onChange={e => setAssignmentForm(f => ({ ...f, vehicleId: e.target.value }))}
                                 className="w-full p-2 border rounded mt-1"
                             >
                                 <option value="">-- Pilih Armada --</option>
@@ -583,9 +584,9 @@ export const RoutePlanning: React.FC = () => {
 
                         <div>
                             <label className="block text-sm font-semibold mb-1">Pilih Driver</label>
-                            <select 
-                                value={assignmentForm.driverId} 
-                                onChange={e => setAssignmentForm(f => ({...f, driverId: e.target.value}))} 
+                            <select
+                                value={assignmentForm.driverId}
+                                onChange={e => setAssignmentForm(f => ({ ...f, driverId: e.target.value }))}
                                 className="w-full p-2 border rounded mt-1"
                             >
                                 <option value="">-- Pilih Driver --</option>
@@ -598,19 +599,19 @@ export const RoutePlanning: React.FC = () => {
                         </div>
 
                         <div className="flex justify-end pt-4 gap-2">
-                            <button 
+                            <button
                                 onClick={() => {
                                     setIsAssignModalOpen(false);
                                     setSelectedRouteForAssignment(null);
                                     setAssignmentForm({ vehicleId: '', driverId: '' });
-                                }} 
+                                }}
                                 className="bg-gray-200 py-2 px-4 rounded-lg hover:bg-gray-300 transition"
                             >
                                 Batal
                             </button>
-                            <button 
-                                onClick={handleAssignDriverVehicle} 
-                                disabled={assignDriverVehicleMutation.isPending || !assignmentForm.vehicleId || !assignmentForm.driverId} 
+                            <button
+                                onClick={handleAssignDriverVehicle}
+                                disabled={assignDriverVehicleMutation.isPending || !assignmentForm.vehicleId || !assignmentForm.driverId}
                                 className="bg-brand-primary text-white py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark transition"
                             >
                                 {assignDriverVehicleMutation.isPending ? 'Meng-assign...' : 'Assign'}

@@ -82,6 +82,7 @@ export interface Order {
   desiredDeliveryDate?: string;
   location: Coordinate;
   assignedVehicleId: string | null;
+  shipmentId: string | null; // NEW: Link to shipment/load
   orderedBy: { id: string; name: string; role: string; };
   priority?: boolean;
 }
@@ -148,6 +149,23 @@ export interface RouteStop {
   distanceFromPrev?: number;
 }
 
+// ============================================
+// NEW: Shipment/Load Management Types
+// ============================================
+
+export interface Shipment {
+  id: string;
+  name: string; // e.g., "Pengiriman Bantul 29 Okt"
+  date: string; // YYYY-MM-DD
+  orders: Order[]; // List of orders in this shipment
+  status: 'unassigned' | 'assigned' | 'departed' | 'completed';
+  driverId: string | null;
+  vehicleId: string | null;
+  routePlanId: string | null; // Created after assignment
+  createdAt: string;
+  region?: string;
+}
+
 export interface RoutePlan {
   id: string;
   driverId: string | null;
@@ -156,6 +174,7 @@ export interface RoutePlan {
   stops: RouteStop[];
   region: string;
   assignmentStatus: 'unassigned' | 'assigned' | 'departed' | 'completed';
+  shipmentId?: string; // Link back to shipment
 }
 
 export interface SalesVisitStop {
