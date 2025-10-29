@@ -4,6 +4,7 @@ import './index.css'; // Import Tailwind CSS
 import App from './App';
 import { AppProvider } from './context/AppContext';
 import * as TanstackQuery from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
 
 const queryClient = new TanstackQuery.QueryClient();
 
@@ -16,9 +17,11 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <TanstackQuery.QueryClientProvider client={queryClient}>
-      <AppProvider>
-        <App />
-      </AppProvider>
+      <BrowserRouter>
+        <AppProvider>
+          <App />
+        </AppProvider>
+      </BrowserRouter>
     </TanstackQuery.QueryClientProvider>
   </React.StrictMode>
 );

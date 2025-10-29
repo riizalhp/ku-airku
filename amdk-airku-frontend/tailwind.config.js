@@ -6,14 +6,20 @@ export default {
   ],
   theme: {
     extend: {
-        colors: {
-          'brand-primary': '#0077B6', // A shade of blue
-          'brand-secondary': '#00B4D8', // A lighter blue/cyan
-          'brand-dark': '#03045E',    // A dark blue
-          'brand-light': '#90E0EF',   // A very light blue
-          'brand-background': '#F0F2F5', // A light grey for background
-        }
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
       },
+      colors: {
+        'brand-primary': '#0077B6',
+        'brand-secondary': '#00B4D8',
+        'brand-light': '#ADE8F4',
+        'brand-background': '#F0F8FF',
+        'brand-dark': '#03045E',
+        'status-pending': '#FBBF24',
+        'status-delivered': '#34D399',
+        'status-failed': '#F87171',
+      },
+    },
   },
   plugins: [],
 }
