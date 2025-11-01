@@ -8,6 +8,7 @@ import { getOrders, createOrder, updateOrder, deleteOrder, batchAssignOrders } f
 import { getStores } from '../../services/storeApiService';
 import { getProducts } from '../../services/productApiService';
 import { getVehicles } from '../../services/vehicleApiService';
+import { createDeliveryRoute } from '../../services/routeApiService';
 
 const EnhancedStatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
     const statusInfo = useMemo(() => {
@@ -359,12 +360,90 @@ const BatchAssignModal: React.FC<{ isOpen: boolean; onClose: () => void; selecte
     );
 };
 
+const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+    const queryClient = useQueryClient();
+    const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
+    const [error, setError] = useState('');
+
+    const createRouteMutation = useMutation({
+        mutationFn: createDeliveryRoute,
+        onSuccess: (data) => {
+            alert(data.message || 'Rute optimal berhasil dibuat!');
+            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            onClose();
+        },
+        onError: (err: any) => {
+            setError(err.response?.data?.message || 'Gagal membuat rute.');
+        },
+    });
+
+    const handleSubmit = () => {
+        if (!deliveryDate) {
+            setError('Harap pilih tanggal pengiriman.');
+            return;
+        }
+        setError('');
+        createRouteMutation.mutate({ deliveryDate, assignments: [] });
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            setDeliveryDate(new Date().toISOString().split('T')[0]);
+            setError('');
+        }
+    }, [isOpen]);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Buat Rute Optimal">
+            <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                    <p className="text-sm text-gray-700">
+                        Sistem akan membuat rute optimal dari semua pesanan <strong>Pending</strong> untuk tanggal yang dipilih.
+                        Rute akan dikelompokkan per wilayah dan dioptimalkan menggunakan algoritma Clarke-Wright.
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                        <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Tanggal Pengiriman</label>
+                    <input
+                        type="date"
+                        value={deliveryDate}
+                        onChange={(e) => setDeliveryDate(e.target.value)}
+                        className="w-full p-2 border rounded-md"
+                    />
+                </div>
+
+                <div className="flex justify-end pt-4 gap-2">
+                    <button onClick={onClose} className="bg-gray-200 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={createRouteMutation.isPending}
+                        className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark"
+                    >
+                        {createRouteMutation.isPending ? 'Membuat Rute...' : 'Buat Rute Optimal'}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 export const OrderManagement: React.FC = () => {
     const queryClient = useQueryClient();
     const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
     const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
+    const [isCreateRouteModalOpen, setIsCreateRouteModalOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
     const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
     const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -423,6 +502,14 @@ export const OrderManagement: React.FC = () => {
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-brand-dark">Manajemen Pesanan</h1>
                 <div className="flex items-center gap-4">
+                    {pendingOrders.length > 0 && (
+                        <button 
+                            onClick={() => setIsCreateRouteModalOpen(true)} 
+                            className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"
+                        >
+                            <ICONS.route /> Buat Rute Optimal
+                        </button>
+                    )}
                     {selectedOrderIds.length > 0 && (
                         <button onClick={() => setIsBatchAssignModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
                             <ICONS.checkCircle /> Tugaskan ({selectedOrderIds.length}) Pesanan
@@ -469,6 +556,7 @@ export const OrderManagement: React.FC = () => {
             </Card>
             <AddEditOrderModal isOpen={isAddEditModalOpen} onClose={() => setIsAddEditModalOpen(false)} orderToEdit={orderToEdit} vehicles={vehicles} />
             {isBatchAssignModalOpen && <BatchAssignModal isOpen={isBatchAssignModalOpen} onClose={() => setIsBatchAssignModalOpen(false)} selectedOrderIds={selectedOrderIds} vehicles={vehicles} />}
+            {isCreateRouteModalOpen && <CreateRouteModal isOpen={isCreateRouteModalOpen} onClose={() => setIsCreateRouteModalOpen(false)} />}
         </div>
     );
 };

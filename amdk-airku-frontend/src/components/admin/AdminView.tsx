@@ -21,7 +21,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     { path: 'reports', label: 'Laporan', icon: <ICONS.fileText /> },
     
     // --- Group 2: Daily Operations ---
-    { path: 'fleet', label: 'Manajemen Muatan & Armada', icon: <ICONS.fleet /> },
+    { path: 'fleet', label: 'Pantau Muatan', icon: <ICONS.fleet /> },
     { path: 'trip-history', label: 'Riwayat Perjalanan', icon: <ICONS.history /> },
     
     // --- Group 3: Sales & Data Entry ---
