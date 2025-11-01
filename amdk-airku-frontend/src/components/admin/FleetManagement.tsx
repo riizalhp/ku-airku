@@ -3,87 +3,91 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { getVehicles } from '../../services/vehicleApiService';
 import { getUsers } from '../../services/userApiService';
-import { getShipments, assignShipment, deleteShipment, createShipment, removeOrderFromShipment } from '../../services/shipmentApiService';
-import { getOrders } from '../../services/orderApiService';
-import { getProducts } from '../../services/productApiService';
-import { VehicleStatus, Vehicle, User, Order, Product, Shipment, Role } from '../../types';
+import { getDeliveryRoutes, assignDriverVehicle } from '../../services/routeApiService';
+import { Vehicle, User, RoutePlan, Role } from '../../types';
 import { Modal } from '../ui/Modal';
 import { ICONS } from '../../constants';
+import { getDistance } from '../../utils/geolocation';
 
-const OrderStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const statusInfo = useMemo(() => {
-        const statusMap: Record<string, { text: string; className: string }> = {
-            'Pending': { text: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
-            'Routed': { text: 'Routed', className: 'bg-cyan-100 text-cyan-800' },
-            'Delivering': { text: 'Delivering', className: 'bg-indigo-100 text-indigo-800' },
-            'Failed': { text: 'Failed', className: 'bg-red-100 text-red-800' },
-            'Delivered': { text: 'Delivered', className: 'bg-green-100 text-green-800' },
-        };
-        return statusMap[status] || { text: status, className: 'bg-gray-100 text-gray-800' };
-    }, [status]);
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.className}`}>{statusInfo.text}</span>;
+const RouteStatusBadge: React.FC<{ driverId?: string | null; vehicleId?: string | null }> = ({ driverId, vehicleId }) => {
+    if (driverId && vehicleId) {
+        return <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Sudah Ditugaskan</span>;
+    }
+    return <span className="px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-800">Belum Ditugaskan</span>;
 };
 
-const ShipmentStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const statusInfo = useMemo(() => {
-        const statusMap: Record<string, { text: string; className: string }> = {
-            'unassigned': { text: 'Belum Ditugaskan', className: 'bg-yellow-100 text-yellow-800' },
-            'assigned': { text: 'Sudah Ditugaskan', className: 'bg-blue-100 text-blue-800' },
-            'departed': { text: 'Sudah Berangkat', className: 'bg-green-100 text-green-800' },
-            'completed': { text: 'Selesai', className: 'bg-gray-100 text-gray-800' },
-        };
-        return statusMap[status] || { text: status, className: 'bg-gray-100 text-gray-800' };
-    }, [status]);
-    return <span className={`px-3 py-1 text-sm font-semibold rounded-full ${statusInfo.className}`}>{statusInfo.text}</span>;
-};
-
-interface AssignmentModalProps {
-    shipment: Shipment | null;
+interface AssignModalProps {
+    route: RoutePlan | null;
     onClose: () => void;
     vehicles: Vehicle[];
     users: User[];
-    mutation: any;
 }
 
-const AssignmentModal: React.FC<AssignmentModalProps> = ({ shipment, onClose, vehicles, users, mutation }) => {
+const AssignModal: React.FC<AssignModalProps> = ({ route, onClose, vehicles, users }) => {
+    const queryClient = useQueryClient();
     const [vehicleId, setVehicleId] = useState('');
     const [driverId, setDriverId] = useState('');
+    const [error, setError] = useState('');
 
     const availableVehicles = useMemo(() => {
-        return vehicles.filter(v => v.status === VehicleStatus.IDLE);
+        return vehicles.filter(v => v.status === 'Idle');
     }, [vehicles]);
 
     const availableDrivers = useMemo(() => {
         return users.filter(u => u.role === Role.DRIVER);
     }, [users]);
 
+    const assignMutation = useMutation({
+        mutationFn: ({ routeId, vehicleId, driverId }: { routeId: string; vehicleId: string; driverId: string }) => 
+            assignDriverVehicle({ routeId, vehicleId, driverId }),
+        onSuccess: () => {
+            alert('Rute berhasil ditugaskan!');
+            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
+            queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+            onClose();
+        },
+        onError: (err: any) => {
+            setError(err.response?.data?.message || 'Gagal menugaskan rute.');
+        },
+    });
+
     const handleSubmit = () => {
         if (!vehicleId || !driverId) {
-            alert('Harap pilih armada dan driver');
+            setError('Harap pilih armada dan driver');
             return;
         }
-        if (!shipment) return;
+        if (!route) return;
         
-        mutation.mutate({
-            shipmentId: shipment.id,
+        setError('');
+        assignMutation.mutate({
+            routeId: route.id,
             vehicleId,
             driverId
         });
     };
 
-    if (!shipment) return null;
+    if (!route) return null;
 
     return (
-        <Modal title={`Tugaskan Muatan: ${shipment.name}`} isOpen={!!shipment} onClose={onClose}>
+        <Modal title="Tugaskan Armada & Driver" isOpen={!!route} onClose={onClose}>
             <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                     <p className="text-sm text-gray-700 mb-2">
-                        <strong>Total Pesanan:</strong> {shipment.orders.length} pesanan
+                        <strong>Wilayah:</strong> {route.region}
+                    </p>
+                    <p className="text-sm text-gray-700 mb-2">
+                        <strong>Total Pemberhentian:</strong> {route.stops.length} toko
                     </p>
                     <p className="text-sm text-gray-700">
-                        <strong>Tanggal:</strong> {new Date(shipment.date).toLocaleDateString('id-ID')}
+                        <strong>Tanggal:</strong> {new Date(route.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                 </div>
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                        <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                )}
 
                 <div>
                     <label className="block text-sm font-semibold mb-1 text-gray-700">Pilih Armada</label>
@@ -100,7 +104,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ shipment, onClose, ve
                         ))}
                     </select>
                     {availableVehicles.length === 0 && (
-                        <p className="text-xs text-red-600 mt-1">⚠️ Tidak ada armada idle yang tersedia</p>
+                        <p className="text-sm text-red-600 mt-1">Tidak ada armada yang tersedia (Idle).</p>
                     )}
                 </div>
 
@@ -112,30 +116,30 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ shipment, onClose, ve
                         className="w-full p-2 border rounded bg-white"
                     >
                         <option value="">-- Pilih Driver --</option>
-                        {availableDrivers.map(d => (
-                            <option key={d.id} value={d.id}>
-                                {d.name}
+                        {availableDrivers.map(u => (
+                            <option key={u.id} value={u.id}>
+                                {u.name}
                             </option>
                         ))}
                     </select>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                    <p className="text-sm text-gray-700">
-                        <strong>ℹ️ Info:</strong> Setelah ditugaskan, sistem akan otomatis membuat rute optimal untuk perjalanan ini.
-                    </p>
+                    {availableDrivers.length === 0 && (
+                        <p className="text-sm text-red-600 mt-1">Tidak ada driver yang tersedia.</p>
+                    )}
                 </div>
 
                 <div className="flex justify-end pt-4 gap-2">
-                    <button onClick={onClose} className="bg-gray-200 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">
+                    <button 
+                        onClick={onClose} 
+                        className="bg-gray-200 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition"
+                    >
                         Batal
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={mutation.isPending || !vehicleId || !driverId}
+                        disabled={assignMutation.isPending || !vehicleId || !driverId}
                         className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark transition"
                     >
-                        {mutation.isPending ? 'Menugaskan...' : 'Tugaskan & Buat Rute'}
+                        {assignMutation.isPending ? 'Menugaskan...' : 'Tugaskan'}
                     </button>
                 </div>
             </div>
@@ -145,366 +149,189 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ shipment, onClose, ve
 
 export const FleetManagement: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
-    const queryClient = useQueryClient();
+    const [selectedDate, setSelectedDate] = useState(today);
+    const [selectedRoute, setSelectedRoute] = useState<RoutePlan | null>(null);
+    const [expandedRouteIds, setExpandedRouteIds] = useState<string[]>([]);
+
+    const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({ 
+        queryKey: ['vehicles'], 
+        queryFn: getVehicles 
+    });
     
-    const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [newShipmentName, setNewShipmentName] = useState('');
-    const [newShipmentDate, setNewShipmentDate] = useState(today);
-
-    const { data: vehicles = [] } = useQuery<Vehicle[]>({ queryKey: ['vehicles'], queryFn: getVehicles });
-    const { data: users = [] } = useQuery<User[]>({ queryKey: ['users'], queryFn: getUsers });
-    const { data: shipments = [], isLoading } = useQuery<Shipment[]>({ 
-        queryKey: ['shipments', { date: today }], 
-        queryFn: () => getShipments({ date: today }) 
+    const { data: users = [], isLoading: isLoadingUsers } = useQuery<User[]>({ 
+        queryKey: ['users'], 
+        queryFn: getUsers 
     });
-    const { data: orders = [] } = useQuery<Order[]>({ queryKey: ['orders'], queryFn: getOrders });
-    const { data: products = [] } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
-
-    const createShipmentMutation = useMutation({
-        mutationFn: createShipment,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['shipments'] });
-            setIsCreateModalOpen(false);
-            setNewShipmentName('');
-            setNewShipmentDate(today);
-            alert('Muatan baru berhasil dibuat!');
-        },
-        onError: (err: any) => {
-            alert(err.response?.data?.message || 'Gagal membuat muatan.');
-        }
+    
+    const { data: routes = [], isLoading: isLoadingRoutes } = useQuery<RoutePlan[]>({ 
+        queryKey: ['deliveryRoutes', { date: selectedDate }], 
+        queryFn: () => getDeliveryRoutes({ date: selectedDate }) 
     });
 
-    const assignShipmentMutation = useMutation({
-        mutationFn: assignShipment,
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['shipments'] });
-            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
-            queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-            setSelectedShipment(null);
-            alert(data.message || 'Muatan berhasil ditugaskan dan rute telah dibuat!');
-        },
-        onError: (err: any) => {
-            alert(err.response?.data?.message || 'Gagal menugaskan muatan.');
-        }
-    });
+    const isLoading = isLoadingVehicles || isLoadingUsers || isLoadingRoutes;
 
-    const deleteShipmentMutation = useMutation({
-        mutationFn: deleteShipment,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['shipments'] });
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
-            alert('Muatan berhasil dihapus.');
-        },
-        onError: (err: any) => {
-            alert(err.response?.data?.message || 'Gagal menghapus muatan.');
-        }
-    });
+    // Calculate total distance for each route
+    const routesWithDistance = useMemo(() => {
+        const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
+        
+        return routes.map(route => {
+            let totalDistance = 0;
+            let lastLocation = depotLocation;
 
-    const removeOrderMutation = useMutation({
-        mutationFn: removeOrderFromShipment,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['shipments'] });
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
-            alert('Pesanan berhasil dihapus dari muatan.');
-        },
-        onError: (err: any) => {
-            alert(err.response?.data?.message || 'Gagal menghapus pesanan.');
-        }
-    });
-
-    const shipmentsWithDetails = useMemo(() => {
-        if (!shipments.length || !products.length) return [];
-
-        return shipments.map(shipment => {
-            const ordersWithLoad = shipment.orders.map(order => {
-                const load = order.items.reduce((sum, item) => {
-                    const product = products.find(p => p.id === item.productId);
-                    return sum + (item.quantity * (product?.capacityUnit || 0));
-                }, 0);
-                return { ...order, load: Math.round(load * 10) / 10 };
+            route.stops.forEach(stop => {
+                const distance = getDistance(lastLocation, stop.location);
+                totalDistance += distance;
+                lastLocation = stop.location;
             });
 
-            const totalLoad = ordersWithLoad.reduce((sum, order) => sum + order.load, 0);
-            
-            const driver = shipment.driverId ? users.find(u => u.id === shipment.driverId) : null;
-            const vehicle = shipment.vehicleId ? vehicles.find(v => v.id === shipment.vehicleId) : null;
+            // Add return distance to depot
+            totalDistance += getDistance(lastLocation, depotLocation);
 
             return {
-                ...shipment,
-                orders: ordersWithLoad,
-                totalLoad: Math.round(totalLoad * 10) / 10,
-                driver,
-                vehicle
+                ...route,
+                totalDistance: Math.round(totalDistance * 10) / 10
             };
         });
-    }, [shipments, orders, products, users, vehicles]);
+    }, [routes]);
 
-    const handleCreateShipment = () => {
-        if (!newShipmentName.trim()) {
-            alert('Harap isi nama muatan');
-            return;
-        }
-        createShipmentMutation.mutate({
-            name: newShipmentName,
-            date: newShipmentDate
-        });
+    const toggleExpand = (routeId: string) => {
+        setExpandedRouteIds(prev =>
+            prev.includes(routeId) ? prev.filter(id => id !== routeId) : [...prev, routeId]
+        );
     };
-
-    const handleDeleteShipment = (shipmentId: string) => {
-        if (window.confirm('Apakah Anda yakin ingin menghapus muatan ini? Semua pesanan akan dikembalikan ke status pending.')) {
-            deleteShipmentMutation.mutate(shipmentId);
-        }
-    };
-
-    const handleRemoveOrder = (shipmentId: string, orderId: string) => {
-        if (window.confirm('Apakah Anda yakin ingin menghapus pesanan ini dari muatan?')) {
-            removeOrderMutation.mutate({ shipmentId, orderId });
-        }
-    };
-
-    if (isLoading) {
-        return <div className="p-8">Memuat data muatan...</div>;
-    }
 
     return (
         <div className="p-8 space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-brand-dark">Manajemen Muatan & Armada</h1>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center gap-2 bg-brand-primary text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-brand-dark transition"
-                >
-                    <ICONS.plus />
-                    Buat Muatan Baru
-                </button>
             </div>
 
-            <Card className="bg-blue-50 border border-blue-200">
-                <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 text-brand-primary pt-1">
-                        <ICONS.orders className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h3 className="text-md font-bold text-brand-dark">Flow Manajemen Muatan</h3>
-                        <ol className="text-sm text-gray-700 mt-2 ml-4 list-decimal space-y-1">
-                            <li><strong>Buat Muatan Baru</strong> - Buat container untuk group pesanan</li>
-                            <li><strong>Tambah Pesanan</strong> - Dari halaman Manajemen Pesanan, assign pesanan ke muatan</li>
-                            <li><strong>Tugaskan Driver & Armada</strong> - Klik tombol "Tugaskan" untuk assign dan membuat rute</li>
-                            <li><strong>Rute Otomatis Dibuat</strong> - Sistem membuat rute optimal setelah penugasan</li>
-                        </ol>
-                    </div>
+            <Card>
+                <div className="flex items-center gap-4">
+                    <label className="text-sm font-semibold">Pilih Tanggal:</label>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="p-2 border rounded-md"
+                    />
+                    <span className="text-sm text-gray-600">
+                        {routes.length} rute ditemukan
+                    </span>
                 </div>
             </Card>
 
-            {shipmentsWithDetails.length === 0 ? (
+            {isLoading ? (
                 <Card>
-                    <p className="text-center py-10 text-gray-500">
-                        Belum ada muatan untuk hari ini. Klik "Buat Muatan Baru" untuk memulai.
-                    </p>
+                    <p className="text-center py-10 text-gray-500">Memuat rute...</p>
+                </Card>
+            ) : routesWithDistance.length === 0 ? (
+                <Card>
+                    <div className="text-center py-10">
+                        <ICONS.route className="mx-auto mb-4 text-gray-400" width={48} height={48} />
+                        <p className="text-gray-500 mb-2">Belum ada rute untuk tanggal ini.</p>
+                        <p className="text-sm text-gray-400">
+                            Buat rute optimal dari halaman <strong>Manajemen Pesanan</strong> terlebih dahulu.
+                        </p>
+                    </div>
                 </Card>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {shipmentsWithDetails.map(shipment => (
-                        <Card key={shipment.id} className="flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h2 className="font-bold text-lg text-brand-primary">{shipment.name}</h2>
-                                    <p className="text-sm text-gray-500">
-                                        {new Date(shipment.date).toLocaleDateString('id-ID', { 
-                                            weekday: 'long', 
-                                            day: 'numeric', 
-                                            month: 'long' 
-                                        })}
-                                    </p>
-                                    {shipment.region && (
-                                        <p className="text-xs text-gray-600 mt-1">
-                                            <strong>Wilayah:</strong> {shipment.region}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {routesWithDistance.map((route) => {
+                        const driver = users.find(u => u.id === route.driverId);
+                        const vehicle = vehicles.find(v => v.id === route.vehicleId);
+                        const isExpanded = expandedRouteIds.includes(route.id);
+                        const isAssigned = !!route.driverId && !!route.vehicleId;
+
+                        return (
+                            <Card key={route.id} className={isAssigned ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-yellow-500'}>
+                                <div className="space-y-3">
+                                    {/* Header */}
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-brand-dark">{route.region}</h3>
+                                            <p className="text-sm text-gray-600">
+                                                {route.stops.length} Pemberhentian
+                                            </p>
+                                        </div>
+                                        <RouteStatusBadge driverId={route.driverId} vehicleId={route.vehicleId} />
+                                    </div>
+
+                                    {/* Distance */}
+                                    <div className="bg-blue-50 p-3 rounded-lg">
+                                        <p className="text-sm font-semibold text-gray-700">
+                                            <ICONS.mapPin className="inline mr-1" width={16} height={16} />
+                                            Jarak Total: <span className="text-brand-primary">{route.totalDistance} km</span>
                                         </p>
+                                    </div>
+
+                                    {/* Assignment Info */}
+                                    {isAssigned ? (
+                                        <div className="border-t pt-3">
+                                            <p className="text-sm text-gray-700 mb-1">
+                                                <strong>Driver:</strong> {driver?.name || '-'}
+                                            </p>
+                                            <p className="text-sm text-gray-700">
+                                                <strong>Armada:</strong> {vehicle?.plateNumber || '-'} ({vehicle?.model || '-'})
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setSelectedRoute(route)}
+                                            className="w-full bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-dark transition"
+                                        >
+                                            <ICONS.fleet className="inline mr-2" width={18} height={18} />
+                                            Tugaskan Armada
+                                        </button>
+                                    )}
+
+                                    {/* Expand/Collapse */}
+                                    <button
+                                        onClick={() => toggleExpand(route.id)}
+                                        className="w-full text-sm text-brand-primary font-semibold hover:underline mt-2"
+                                    >
+                                        {isExpanded ? 'Sembunyikan Detail' : 'Lihat Detail Pemberhentian'}
+                                    </button>
+
+                                    {/* Expanded Details */}
+                                    {isExpanded && (
+                                        <div className="border-t pt-3 mt-3">
+                                            <h4 className="font-semibold text-gray-800 mb-2">Daftar Pemberhentian:</h4>
+                                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                                {route.stops.map((stop, index) => (
+                                                    <div key={stop.id} className="bg-gray-50 p-2 rounded text-sm">
+                                                        <p className="font-semibold text-gray-700">
+                                                            {index + 1}. {stop.storeName}
+                                                        </p>
+                                                        <p className="text-gray-600 text-xs">
+                                                            Pesanan: {stop.orderId.slice(-6).toUpperCase()}
+                                                        </p>
+                                                        <p className="text-gray-600 text-xs">
+                                                            Status: <span className={`font-semibold ${stop.status === 'Completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                                {stop.status === 'Completed' ? 'Selesai' : 'Pending'}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                                <ShipmentStatusBadge status={shipment.status} />
-                            </div>
-
-                            {shipment.vehicle && shipment.driver && (
-                                <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4">
-                                    <p className="text-sm text-gray-700">
-                                        <strong>Driver:</strong> {shipment.driver.name}
-                                    </p>
-                                    <p className="text-sm text-gray-700">
-                                        <strong>Armada:</strong> {shipment.vehicle.plateNumber} ({shipment.vehicle.model})
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className="mb-4">
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="font-semibold">Total Muatan</span>
-                                    <span>
-                                        {shipment.totalLoad} / {shipment.vehicle?.capacity || '?'} unit
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-4 relative">
-                                    <div 
-                                        className={`h-4 rounded-full ${
-                                            shipment.vehicle && shipment.totalLoad > shipment.vehicle.capacity 
-                                                ? 'bg-red-500' 
-                                                : 'bg-brand-primary'
-                                        }`}
-                                        style={{ 
-                                            width: `${
-                                                shipment.vehicle 
-                                                    ? Math.min((shipment.totalLoad / shipment.vehicle.capacity) * 100, 100)
-                                                    : 50
-                                            }%` 
-                                        }}
-                                    ></div>
-                                </div>
-                                {shipment.vehicle && shipment.totalLoad > shipment.vehicle.capacity && (
-                                    <p className="text-red-500 text-xs text-right mt-1 font-semibold">
-                                        ⚠️ Kapasitas terlampaui!
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="flex-grow">
-                                <h3 className="font-semibold text-sm text-gray-700 mb-2">
-                                    Daftar Pesanan ({shipment.orders.length})
-                                </h3>
-                                {shipment.orders.length === 0 ? (
-                                    <p className="text-sm text-gray-500 italic text-center py-4">
-                                        Belum ada pesanan. Tambahkan dari halaman Manajemen Pesanan.
-                                    </p>
-                                ) : (
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                        {shipment.orders.map(order => (
-                                            <div key={order.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                                                <div className="flex-grow">
-                                                    <p className="font-semibold text-gray-800">{order.storeName}</p>
-                                                    <p className="text-xs text-gray-500">
-                                                        ID: {order.id.slice(0, 8)} | Load: {order.load} unit
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <OrderStatusBadge status={order.status} />
-                                                    {shipment.status === 'unassigned' && (
-                                                        <button
-                                                            onClick={() => handleRemoveOrder(shipment.id, order.id)}
-                                                            className="text-red-600 hover:text-red-800 p-1"
-                                                            title="Hapus dari muatan"
-                                                        >
-                                                            <ICONS.trash className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="mt-4 pt-4 border-t flex gap-2">
-                                {shipment.status === 'unassigned' && (
-                                    <>
-                                        <button
-                                            onClick={() => setSelectedShipment(shipment)}
-                                            disabled={shipment.orders.length === 0}
-                                            className="flex-1 bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-dark transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        >
-                                            <ICONS.fleet className="inline w-4 h-4 mr-2" />
-                                            Tugaskan
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteShipment(shipment.id)}
-                                            className="bg-red-100 text-red-700 font-bold py-2 px-4 rounded-lg hover:bg-red-200 transition"
-                                        >
-                                            <ICONS.trash className="inline w-4 h-4" />
-                                        </button>
-                                    </>
-                                )}
-                                {shipment.status === 'assigned' && (
-                                    <button
-                                        className="flex-1 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition"
-                                    >
-                                        🚚 Berangkatkan
-                                    </button>
-                                )}
-                                {(shipment.status === 'departed' || shipment.status === 'completed') && (
-                                    <button
-                                        className="flex-1 bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg cursor-not-allowed"
-                                        disabled
-                                    >
-                                        {shipment.status === 'departed' ? 'Sedang Berjalan' : 'Selesai'}
-                                    </button>
-                                )}
-                            </div>
-                        </Card>
-                    ))}
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
 
-            {/* Create Shipment Modal */}
-            <Modal 
-                title="Buat Muatan Baru" 
-                isOpen={isCreateModalOpen} 
-                onClose={() => setIsCreateModalOpen(false)}
-            >
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-semibold mb-1 text-gray-700">
-                            Nama Muatan
-                        </label>
-                        <input
-                            type="text"
-                            value={newShipmentName}
-                            onChange={(e) => setNewShipmentName(e.target.value)}
-                            placeholder="Contoh: Pengiriman Bantul 29 Okt"
-                            className="w-full p-2 border rounded"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-1 text-gray-700">
-                            Tanggal
-                        </label>
-                        <input
-                            type="date"
-                            value={newShipmentDate}
-                            onChange={(e) => setNewShipmentDate(e.target.value)}
-                            className="w-full p-2 border rounded"
-                        />
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                        <p className="text-sm text-gray-700">
-                            <strong>ℹ️ Info:</strong> Setelah muatan dibuat, Anda dapat menambahkan pesanan dari halaman Manajemen Pesanan.
-                        </p>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                        <button
-                            onClick={() => setIsCreateModalOpen(false)}
-                            className="bg-gray-200 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition"
-                        >
-                            Batal
-                        </button>
-                        <button
-                            onClick={handleCreateShipment}
-                            disabled={createShipmentMutation.isPending}
-                            className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark transition"
-                        >
-                            {createShipmentMutation.isPending ? 'Membuat...' : 'Buat Muatan'}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
             {/* Assignment Modal */}
-            <AssignmentModal
-                shipment={selectedShipment}
-                onClose={() => setSelectedShipment(null)}
-                vehicles={vehicles}
-                users={users}
-                mutation={assignShipmentMutation}
-            />
+            {selectedRoute && (
+                <AssignModal
+                    route={selectedRoute}
+                    onClose={() => setSelectedRoute(null)}
+                    vehicles={vehicles}
+                    users={users}
+                />
+            )}
         </div>
     );
 };
