@@ -74,12 +74,6 @@ const addOrderToShipment = async (req, res) => {
             });
         }
 
-        if (order.shipmentId && order.shipmentId !== shipmentId) {
-            return res.status(400).json({ 
-                message: 'Pesanan sudah ada di muatan lain. Hapus dari muatan tersebut terlebih dahulu.' 
-            });
-        }
-
         // Check if shipment is still unassigned
         if (shipment.status !== 'unassigned') {
             return res.status(400).json({ 

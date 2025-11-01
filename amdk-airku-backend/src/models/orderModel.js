@@ -6,7 +6,7 @@ const Order = {
     getAll: async () => {
         const ordersQuery = `
             SELECT 
-                o.id, o.storeId, o.totalAmount, o.status, o.orderDate, o.desiredDeliveryDate, o.assignedVehicleId, o.shipmentId, o.orderedById, o.orderedByName, o.orderedByRole, o.priority,
+                o.id, o.storeId, o.totalAmount, o.status, o.orderDate, o.desiredDeliveryDate, o.assignedVehicleId, o.orderedById, o.orderedByName, o.orderedByRole, o.priority,
                 s.name as storeName, s.lat, s.lng, s.region
             FROM orders o
             JOIN stores s ON o.storeId = s.id
