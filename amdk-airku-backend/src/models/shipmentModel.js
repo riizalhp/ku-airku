@@ -45,23 +45,39 @@ const Shipment = {
                     o.*,
                     s.name as store_name,
                     s.address,
-                    s.location,
+                    s.lat,
+                    s.lng,
+                    s.region,
                     JSON_OBJECT('id', u.id, 'name', u.name, 'role', u.role) as ordered_by
                 FROM orders o
-                JOIN stores s ON o.store_id = s.id
-                JOIN users u ON o.ordered_by_id = u.id
-                WHERE o.shipment_id = ?
-                ORDER BY o.order_date DESC
+                JOIN stores s ON o.storeId = s.id
+                JOIN users u ON o.orderedById = u.id
+                WHERE o.shipmentId = ?
+                ORDER BY o.orderDate DESC
             `, [shipment.id]);
 
             // Parse JSON fields
-            shipment.orders = orders.map(order => ({
-                ...order,
-                items: JSON.parse(order.items),
-                location: JSON.parse(order.location),
-                orderedBy: JSON.parse(order.ordered_by),
-                storeName: order.store_name
-            }));
+            shipment.orders = orders.map(order => {
+                // Get order items
+                const items = [];
+                // Note: Items are fetched separately if needed
+                
+                return {
+                    id: order.id,
+                    storeId: order.storeId,
+                    storeName: order.store_name,
+                    address: order.address,
+                    region: order.region,
+                    location: { lat: parseFloat(order.lat), lng: parseFloat(order.lng) },
+                    totalAmount: order.totalAmount,
+                    status: order.status,
+                    orderDate: order.orderDate,
+                    desiredDeliveryDate: order.desiredDeliveryDate,
+                    priority: order.priority == 1,
+                    orderedBy: JSON.parse(order.ordered_by),
+                    demand: 0 // Will be calculated if needed
+                };
+            });
         }
 
         return shipments.map(s => ({
@@ -104,21 +120,31 @@ const Shipment = {
                 o.*,
                 s.name as store_name,
                 s.address,
-                s.location,
+                s.lat,
+                s.lng,
+                s.region,
                 JSON_OBJECT('id', u.id, 'name', u.name, 'role', u.role) as ordered_by
             FROM orders o
-            JOIN stores s ON o.store_id = s.id
-            JOIN users u ON o.ordered_by_id = u.id
-            WHERE o.shipment_id = ?
-            ORDER BY o.order_date DESC
+            JOIN stores s ON o.storeId = s.id
+            JOIN users u ON o.orderedById = u.id
+            WHERE o.shipmentId = ?
+            ORDER BY o.orderDate DESC
         `, [shipment.id]);
 
         shipment.orders = orders.map(order => ({
-            ...order,
-            items: JSON.parse(order.items),
-            location: JSON.parse(order.location),
+            id: order.id,
+            storeId: order.storeId,
+            storeName: order.store_name,
+            address: order.address,
+            region: order.region,
+            location: { lat: parseFloat(order.lat), lng: parseFloat(order.lng) },
+            totalAmount: order.totalAmount,
+            status: order.status,
+            orderDate: order.orderDate,
+            desiredDeliveryDate: order.desiredDeliveryDate,
+            priority: order.priority == 1,
             orderedBy: JSON.parse(order.ordered_by),
-            storeName: order.store_name
+            demand: 0 // Will be calculated if needed
         }));
 
         return {

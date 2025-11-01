@@ -7,7 +7,7 @@ const Order = {
         const ordersQuery = `
             SELECT 
                 o.id, o.storeId, o.totalAmount, o.status, o.orderDate, o.desiredDeliveryDate, o.assignedVehicleId, o.shipmentId, o.orderedById, o.orderedByName, o.orderedByRole, o.priority,
-                s.name as storeName, s.lat, s.lng
+                s.name as storeName, s.lat, s.lng, s.region
             FROM orders o
             JOIN stores s ON o.storeId = s.id
             ORDER BY o.orderDate DESC, o.id DESC
@@ -29,11 +29,12 @@ const Order = {
         }, {});
 
         return orders.map(order => {
-            const { lat, lng, storeName, orderedById, orderedByName, orderedByRole, ...restOfOrder } = order;
+            const { lat, lng, storeName, region, orderedById, orderedByName, orderedByRole, ...restOfOrder } = order;
             const orderItems = itemsByOrderId[order.id] || [];
             return {
                 ...restOfOrder,
                 storeName,
+                region,
                 location: { lat: parseFloat(lat), lng: parseFloat(lng) },
                 orderedBy: { id: orderedById, name: orderedByName, role: orderedByRole },
                 priority: order.priority == 1,
@@ -48,7 +49,7 @@ const Order = {
     },
     getById: async (id, connection = pool) => {
         const orderQuery = `
-            SELECT o.*, s.name as storeName, s.lat, s.lng 
+            SELECT o.*, s.name as storeName, s.lat, s.lng, s.region 
             FROM orders o
             JOIN stores s ON o.storeId = s.id
             WHERE o.id = ?
@@ -61,10 +62,11 @@ const Order = {
         const itemsQuery = 'SELECT * FROM order_items WHERE orderId = ?';
         const [itemRows] = await connection.query(itemsQuery, [id]);
         
-        const { lat, lng, storeName, orderedById, orderedByName, orderedByRole, priority, ...restOfOrder } = order;
+        const { lat, lng, storeName, region, orderedById, orderedByName, orderedByRole, priority, ...restOfOrder } = order;
         return {
             ...restOfOrder,
             storeName,
+            region,
             location: { lat: parseFloat(lat), lng: parseFloat(lng) },
             orderedBy: { id: orderedById, name: orderedByName, role: orderedByRole },
             priority: priority == 1,
@@ -252,6 +254,7 @@ const Order = {
                 s.address,
                 s.lat,
                 s.lng,
+                s.region,
                 SUM(oi.quantity * p.capacityUnit) as demand
             FROM orders o
             JOIN stores s ON o.storeId = s.id
@@ -263,7 +266,7 @@ const Order = {
                 o.status IN ('Pending', 'Failed') AND
                 (o.desiredDeliveryDate <= ? OR o.desiredDeliveryDate IS NULL) AND
                 (o.assignedVehicleId IS NULL OR rs.id IS NULL OR rp.id IS NULL)
-            GROUP BY o.id, o.storeId, o.desiredDeliveryDate, o.priority, s.name, s.address, s.lat, s.lng
+            GROUP BY o.id, o.storeId, o.desiredDeliveryDate, o.priority, s.name, s.address, s.lat, s.lng, s.region
             ORDER BY o.priority DESC, o.desiredDeliveryDate ASC
         `;
         const [rows] = await pool.query(query, [deliveryDate, deliveryDate]);
@@ -273,6 +276,7 @@ const Order = {
             storeId: row.storeId,
             storeName: row.storeName,
             address: row.address,
+            region: row.region,
             location: { lat: parseFloat(row.lat), lng: parseFloat(row.lng) },
             demand: parseFloat(row.demand),
             priority: row.priority == 1
