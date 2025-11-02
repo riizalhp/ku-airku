@@ -52,13 +52,15 @@ function fallbackClassifyStoreRegion(storeLocation) {
   // 3. BANTUL - Bagian SELATAN DIY (sekitar 506.85 km²)
   // Koordinat referensi: Parangtritis (-8.0228, 110.3290), Alun-alun Bantul (-7.8878, 110.3289)
   // Batas utara: berbatasan dengan Kota Yogya, batas selatan: Laut Selatan
-  if (lat >= -8.20 && lat <= -7.825 && lng >= 110.20 && lng <= 110.50) {
+  // PENTING: Bantul TIDAK termasuk area Kulon Progo (longitude < 110.30)
+  if (lat >= -8.20 && lat <= -7.825 && lng >= 110.30 && lng <= 110.50) {
     return { region: "Bantul" };
   }
   
   // 4. KULON PROGO - Bagian BARAT DIY (sekitar 586.27 km²)
-  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561)
-  // Sub-klasifikasi: Timur dan Barat berdasarkan PDAM
+  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561), Sentolo (-7.82, 110.21)
+  // PENTING: Kulon Progo mencakup area longitude 110.00 - 110.30
+  // Sub-klasifikasi: Timur dan Barat berdasarkan PDAM Tirta Binangun (110.1486773)
   if (lat >= -8.00 && lat <= -7.67 && lng >= 110.00 && lng <= 110.30) {
     const pdamKulonProgoLongitude = 110.1486773;
     if (lng > pdamKulonProgoLongitude) {
@@ -105,14 +107,16 @@ async function classifyStoreRegion(storeLocation) {
     
     3. **Kabupaten Bantul** (Southern DIY - ~506.85 km²)
        - South of Kota Yogyakarta, extends to Indian Ocean coast
-       - Bounding box: lat -8.20 to -7.825, lng 110.20 to 110.50
+       - Bounding box: lat -8.20 to -7.825, lng 110.30 to 110.50
        - Key landmarks: Parangtritis Beach (-8.0228, 110.3290), Bantul Town (-7.8878, 110.3289)
        - Northern border: Kota Yogyakarta, Southern border: Indian Ocean
+       - IMPORTANT: Bantul does NOT include areas with lng < 110.30 (those are Kulon Progo)
     
     4. **Kabupaten Kulon Progo** (Western DIY - ~586.27 km²)
-       - Western part of DIY, includes new YIA airport
+       - Western part of DIY, includes new YIA airport and Sentolo area
        - Bounding box: lat -8.00 to -7.67, lng 110.00 to 110.30
-       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561)
+       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561), Sentolo (-7.82, 110.21)
+       - IMPORTANT: Kulon Progo covers longitude 110.00 - 110.30 (western part of DIY)
        - Sub-classification: 'Kulon Progo - Timur' if lng > ${pdamKulonProgoLongitude}, else 'Kulon Progo - Barat'
     
     5. **Kabupaten Gunung Kidul** (Eastern DIY - LARGEST, ~1,485.36 km²)
