@@ -80,7 +80,18 @@ const deleteProduct = async (req, res) => {
             return res.status(404).json({ message: 'Produk tidak ditemukan.' });
         }
         
-        // TODO: Tambahkan pengecekan dependensi sebelum menghapus (misal: apakah produk ada di pesanan?)
+        // Check if product is used in any orders
+        const pool = require('../config/db');
+        const [orderItems] = await pool.query(
+            'SELECT COUNT(*) as count FROM order_items WHERE productId = ?',
+            [req.params.id]
+        );
+        
+        if (orderItems[0].count > 0) {
+            return res.status(400).json({ 
+                message: `Produk tidak dapat dihapus karena sudah digunakan dalam ${orderItems[0].count} pesanan. Hapus pesanan terkait terlebih dahulu.` 
+            });
+        }
 
         const success = await Product.delete(req.params.id);
         if(success) {
@@ -90,6 +101,14 @@ const deleteProduct = async (req, res) => {
         }
     } catch (error) {
         console.error(`Error deleting product ${req.params.id}:`, error);
+        
+        // Check if it's a foreign key constraint error
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({ 
+                message: 'Produk tidak dapat dihapus karena masih digunakan di pesanan. Hapus pesanan terkait terlebih dahulu.' 
+            });
+        }
+        
         res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
     }
 };

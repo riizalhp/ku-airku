@@ -7,7 +7,7 @@ const { calculateSavingsMatrixRoutes, clusterOrdersByRegion } = require('../serv
 const { getDistance } = require('../utils/geolocation');
 
 const createPlan = async (req, res) => {
-    const { deliveryDate, assignments } = req.body;
+    const { deliveryDate, assignments, selectedOrderIds } = req.body;
 
     if (!deliveryDate) {
         return res.status(400).json({ message: "Harap pilih tanggal pengiriman." });
@@ -19,14 +19,21 @@ const createPlan = async (req, res) => {
     try {
         console.log('[Route Planning] Starting route planning for date:', deliveryDate);
         console.log('[Route Planning] Has assignments:', hasAssignments);
+        console.log('[Route Planning] Selected order IDs:', selectedOrderIds);
         
         // Fetch all routable orders
         console.log('[Route Planning] Fetching routable orders...');
         let remainingOrders = await Order.findRoutableOrders({ deliveryDate });
         console.log('[Route Planning] Routable orders found:', remainingOrders.length);
         
+        // If selectedOrderIds provided, filter only those orders
+        if (selectedOrderIds && Array.isArray(selectedOrderIds) && selectedOrderIds.length > 0) {
+            remainingOrders = remainingOrders.filter(order => selectedOrderIds.includes(order.id));
+            console.log('[Route Planning] Filtered to selected orders:', remainingOrders.length);
+        }
+        
         if (remainingOrders.length === 0) {
-            return res.status(404).json({ message: "Tidak ada pesanan 'Pending' yang bisa dijadwalkan untuk tanggal yang dipilih." });
+            return res.status(404).json({ message: "Tidak ada pesanan yang dipilih atau tersedia untuk tanggal yang dipilih." });
         }
 
         // Validate order data integrity
@@ -76,7 +83,11 @@ async function createUnassignedRoutes(orders, deliveryDate, res) {
     console.log('[Route Planning] Region clusters:', Object.keys(regionClusters));
     
     const allCreatedRoutes = [];
-    const DEFAULT_CAPACITY = 500; // Default capacity unit
+    // Use L300 capacity as default (200 equivalent units)
+    // This is the maximum capacity for heterogeneous loads
+    const DEFAULT_CAPACITY = 200; 
+    
+    console.log('[Route Planning] Using default capacity:', DEFAULT_CAPACITY);
     
     // ===== STEP 2: PROCESS EACH REGION SEPARATELY =====
     for (const [region, regionOrders] of Object.entries(regionClusters)) {
@@ -109,6 +120,8 @@ async function createUnassignedRoutes(orders, deliveryDate, res) {
         }));
 
         console.log(`[Route Planning] Creating routes for ${nodes.length} stores in region ${region}`);
+        console.log('[Route Planning] Store demands:', nodes.map(n => ({ id: n.id, demand: n.demand })));
+        console.log('[Route Planning] Total demand for region:', nodes.reduce((sum, n) => sum + n.demand, 0));
 
         // ===== STEP 3: RUN CLARKE-WRIGHT FOR THIS REGION =====
         const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, DEFAULT_CAPACITY);
@@ -472,6 +485,43 @@ const assignDriverVehicle = async (req, res) => {
     }
 };
 
+const unassignDriverVehicle = async (req, res) => {
+    const { routeId } = req.params;
+
+    try {
+        // Get route and validate
+        const route = await Route.getById(routeId);
+        if (!route) {
+            return res.status(404).json({ message: "Rute tidak ditemukan." });
+        }
+
+        // Check if route is assigned
+        if (!route.driverId || !route.vehicleId) {
+            return res.status(400).json({ message: "Rute belum ditugaskan ke driver dan armada." });
+        }
+
+        // Check if route has already departed
+        if (route.assignmentStatus === 'departed' || route.assignmentStatus === 'completed') {
+            return res.status(400).json({ message: "Tidak dapat membatalkan penugasan rute yang sudah berangkat atau selesai." });
+        }
+
+        // Unassign driver and vehicle
+        const success = await Route.unassignDriverVehicle(routeId);
+        
+        if (success) {
+            res.json({ 
+                message: `Berhasil membatalkan penugasan rute.`,
+                route: await Route.getById(routeId)
+            });
+        } else {
+            res.status(500).json({ message: "Gagal membatalkan penugasan." });
+        }
+    } catch (error) {
+        console.error(`Error unassigning driver/vehicle from route ${routeId}:`, error);
+        res.status(500).json({ message: error.message || 'Gagal membatalkan penugasan.' });
+    }
+};
+
 
 module.exports = {
     createPlan,
@@ -481,4 +531,5 @@ module.exports = {
     deleteRoutePlan,
     moveOrder,
     assignDriverVehicle,
+    unassignDriverVehicle,
 };

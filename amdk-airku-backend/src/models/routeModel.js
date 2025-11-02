@@ -361,6 +361,90 @@ const moveOrder = async (orderId, newVehicleId) => {
     }
 };
 
+const assignDriverVehicle = async (routeId, driverId, vehicleId) => {
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        // Update route plan with driver and vehicle
+        const [result] = await connection.query(
+            'UPDATE route_plans SET driverId = ?, vehicleId = ?, assignmentStatus = ? WHERE id = ?',
+            [driverId, vehicleId, 'assigned', routeId]
+        );
+
+        if (result.affectedRows === 0) {
+            throw new Error('Rute tidak ditemukan.');
+        }
+
+        // Get all orders in this route
+        const [stops] = await connection.query(
+            'SELECT orderId FROM route_stops WHERE routePlanId = ?',
+            [routeId]
+        );
+
+        if (stops.length > 0) {
+            const orderIds = stops.map(s => s.orderId);
+            const placeholders = orderIds.map(() => '?').join(',');
+            
+            // Update orders with vehicle assignment
+            await connection.query(
+                `UPDATE orders SET assignedVehicleId = ? WHERE id IN (${placeholders})`,
+                [vehicleId, ...orderIds]
+            );
+        }
+
+        await connection.commit();
+        return true;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+};
+
+const unassignDriverVehicle = async (routeId) => {
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        // Update route plan to remove driver and vehicle
+        const [result] = await connection.query(
+            'UPDATE route_plans SET driverId = NULL, vehicleId = NULL, assignmentStatus = ? WHERE id = ?',
+            ['unassigned', routeId]
+        );
+
+        if (result.affectedRows === 0) {
+            throw new Error('Rute tidak ditemukan.');
+        }
+
+        // Get all orders in this route
+        const [stops] = await connection.query(
+            'SELECT orderId FROM route_stops WHERE routePlanId = ?',
+            [routeId]
+        );
+
+        if (stops.length > 0) {
+            const orderIds = stops.map(s => s.orderId);
+            const placeholders = orderIds.map(() => '?').join(',');
+            
+            // Clear vehicle assignment from orders (keep status as 'Routed')
+            await connection.query(
+                `UPDATE orders SET assignedVehicleId = NULL WHERE id IN (${placeholders})`,
+                [...orderIds]
+            );
+        }
+
+        await connection.commit();
+        return true;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+};
+
 module.exports = {
   createPlan,
   deletePendingPlansForVehicle,
@@ -369,4 +453,6 @@ module.exports = {
   updateStopStatus,
   deletePlan,
   moveOrder,
+  assignDriverVehicle,
+  unassignDriverVehicle,
 };

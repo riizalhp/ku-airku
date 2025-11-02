@@ -7,14 +7,16 @@ ALTER TABLE `route_plans`
 MODIFY COLUMN `driverId` varchar(36) NULL,
 MODIFY COLUMN `vehicleId` varchar(36) NULL;
 
--- Add status column to track route assignment status
-ALTER TABLE `route_plans`
-ADD COLUMN `assignmentStatus` ENUM(
-    'unassigned',
-    'assigned',
-    'departed',
-    'completed'
-) DEFAULT 'unassigned' AFTER `region`;
+-- Add status column to track route assignment status (skip if already exists)
+-- Note: If you get "Duplicate column" error, this column already exists, skip this step
+-- Uncomment only if the column doesn't exist:
+-- ALTER TABLE `route_plans`
+-- ADD COLUMN `assignmentStatus` ENUM(
+--     'unassigned',
+--     'assigned',
+--     'departed',
+--     'completed'
+-- ) DEFAULT 'unassigned' AFTER `region`;
 
 -- Update existing routes to 'assigned' status (backward compatibility)
 UPDATE `route_plans`
@@ -24,10 +26,11 @@ WHERE
     `driverId` IS NOT NULL
     AND `vehicleId` IS NOT NULL;
 
--- Add index for better query performance
-CREATE INDEX `idx_assignment_status` ON `route_plans` (`assignmentStatus`);
+-- Add indexes for better query performance (skip if already exists)
+-- Note: If you get "Duplicate key name" error, these indexes already exist
+CREATE INDEX IF NOT EXISTS `idx_assignment_status` ON `route_plans` (`assignmentStatus`);
 
-CREATE INDEX `idx_date_status` ON `route_plans` (`date`, `assignmentStatus`);
+CREATE INDEX IF NOT EXISTS `idx_date_status` ON `route_plans` (`date`, `assignmentStatus`);
 
 -- Verification queries (comment out after verification)
 -- SELECT * FROM route_plans WHERE driverId IS NULL OR vehicleId IS NULL;

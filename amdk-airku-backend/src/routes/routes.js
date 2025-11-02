@@ -9,7 +9,8 @@ const {
     updateStopStatus,
     deleteRoutePlan,
     moveOrder,
-    assignDriverVehicle
+    assignDriverVehicle,
+    unassignDriverVehicle
 } = require('../controllers/routeController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -22,6 +23,11 @@ router.post('/plan', protect, admin, createPlan);
 // @desc    Assign driver and vehicle to an unassigned route
 // @access  Private/Admin
 router.put('/:routeId/assign', protect, admin, assignDriverVehicle);
+
+// @route   PUT api/routes/:routeId/unassign
+// @desc    Unassign driver and vehicle from a route
+// @access  Private/Admin
+router.put('/:routeId/unassign', protect, admin, unassignDriverVehicle);
 
 // @route   POST api/routes/move-order
 // @desc    Move an order to a different route or set to pending

@@ -3,11 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { getVehicles } from '../../services/vehicleApiService';
 import { getUsers } from '../../services/userApiService';
-import { getDeliveryRoutes, assignDriverVehicle } from '../../services/routeApiService';
-import { Vehicle, User, RoutePlan, Role } from '../../types';
+import { getDeliveryRoutes, assignDriverVehicle, deleteDeliveryRoute, unassignDriverVehicle } from '../../services/routeApiService';
+import { getOrders } from '../../services/orderApiService';
+import { getProducts } from '../../services/productApiService';
+import { Vehicle, User, RoutePlan, Role, Order, Product } from '../../types';
 import { Modal } from '../ui/Modal';
 import { ICONS } from '../../constants';
 import { getDistance } from '../../utils/geolocation';
+
+interface RouteWithCapacity extends RoutePlan {
+    totalDistance: number;
+    capacityUsed: number;
+}
 
 const RouteStatusBadge: React.FC<{ driverId?: string | null; vehicleId?: string | null }> = ({ driverId, vehicleId }) => {
     if (driverId && vehicleId) {
@@ -148,6 +155,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ route, onClose, vehicles, use
 };
 
 export const FleetManagement: React.FC = () => {
+    const queryClient = useQueryClient();
     const today = new Date().toISOString().split('T')[0];
     const [selectedDate, setSelectedDate] = useState(today);
     const [selectedRoute, setSelectedRoute] = useState<RoutePlan | null>(null);
@@ -168,10 +176,66 @@ export const FleetManagement: React.FC = () => {
         queryFn: () => getDeliveryRoutes({ date: selectedDate }) 
     });
 
-    const isLoading = isLoadingVehicles || isLoadingUsers || isLoadingRoutes;
+    const { data: orders = [], isLoading: isLoadingOrders } = useQuery<Order[]>({
+        queryKey: ['orders'],
+        queryFn: getOrders
+    });
+
+    const { data: products = [], isLoading: isLoadingProducts } = useQuery<Product[]>({
+        queryKey: ['products'],
+        queryFn: getProducts
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteDeliveryRoute,
+        onSuccess: () => {
+            alert('Rute berhasil dibatalkan. Pesanan dikembalikan ke status Pending.');
+            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.message || 'Gagal membatalkan rute.');
+        },
+    });
+
+    const unassignMutation = useMutation({
+        mutationFn: unassignDriverVehicle,
+        onSuccess: () => {
+            alert('Penugasan rute berhasil dibatalkan. Rute kembali ke status belum ditugaskan.');
+            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
+            queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.message || 'Gagal membatalkan penugasan rute.');
+        },
+    });
+
+    const isLoading = isLoadingVehicles || isLoadingUsers || isLoadingRoutes || isLoadingOrders || isLoadingProducts;
+
+    const handleCancelRoute = (routeId: string, routeRegion: string) => {
+        const confirmed = window.confirm(
+            `Apakah Anda yakin ingin membatalkan rute untuk wilayah ${routeRegion}?\n\n` +
+            `Pesanan dalam rute ini akan dikembalikan ke status Pending.`
+        );
+        
+        if (confirmed) {
+            deleteMutation.mutate(routeId);
+        }
+    };
+
+    const handleUnassignRoute = (routeId: string, routeRegion: string) => {
+        const confirmed = window.confirm(
+            `Apakah Anda yakin ingin membatalkan penugasan rute wilayah ${routeRegion}?\n\n` +
+            `Driver dan armada akan dilepas dari rute ini, tetapi rute tetap ada dan pesanan tetap dalam status Routed.`
+        );
+        
+        if (confirmed) {
+            unassignMutation.mutate(routeId);
+        }
+    };
 
     // Calculate total distance for each route
-    const routesWithDistance = useMemo(() => {
+    const routesWithDistance = useMemo<RouteWithCapacity[]>(() => {
         const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
         
         return routes.map(route => {
@@ -187,12 +251,31 @@ export const FleetManagement: React.FC = () => {
             // Add return distance to depot
             totalDistance += getDistance(lastLocation, depotLocation);
 
+            // Calculate capacity usage
+            let totalCapacityUsed = 0;
+            route.stops.forEach(stop => {
+                const order = orders.find(o => o.id === stop.orderId);
+                if (order && order.items) {
+                    order.items.forEach(item => {
+                        const product = products.find(p => p.id === item.productId);
+                        if (product) {
+                            // Use capacityConversionHeterogeneous for calculation
+                            const conversionRate = product.capacityConversionHeterogeneous || 1.0;
+                            totalCapacityUsed += item.quantity * conversionRate;
+                        }
+                    });
+                }
+            });
+
+            console.log(`Route ${route.id}: capacity used = ${totalCapacityUsed}`);
+
             return {
                 ...route,
-                totalDistance: Math.round(totalDistance * 10) / 10
+                totalDistance: Math.round(totalDistance * 10) / 10,
+                capacityUsed: Math.round(totalCapacityUsed * 10) / 10
             };
         });
-    }, [routes]);
+    }, [routes, orders, products]);
 
     const toggleExpand = (routeId: string) => {
         setExpandedRouteIds(prev =>
@@ -265,6 +348,39 @@ export const FleetManagement: React.FC = () => {
                                         </p>
                                     </div>
 
+                                    {/* Capacity Usage */}
+                                    {isAssigned && vehicle && (
+                                        <div className="bg-green-50 p-3 rounded-lg">
+                                            <p className="text-sm font-semibold text-gray-700 mb-1">
+                                                <ICONS.product className="inline mr-1" width={16} height={16} />
+                                                Kapasitas Muatan:
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                                                    <div 
+                                                        className={`h-2.5 rounded-full ${
+                                                            (route.capacityUsed || 0) > vehicle.capacity 
+                                                                ? 'bg-red-600' 
+                                                                : (route.capacityUsed || 0) > vehicle.capacity * 0.9 
+                                                                ? 'bg-yellow-500' 
+                                                                : 'bg-green-600'
+                                                        }`}
+                                                        style={{ width: `${Math.min(((route.capacityUsed || 0) / vehicle.capacity) * 100, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                                                    {route.capacityUsed || 0} / {vehicle.capacity}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-600 mt-1">
+                                                {(((route.capacityUsed || 0) / vehicle.capacity) * 100).toFixed(1)}% terisi
+                                                {(route.capacityUsed || 0) > vehicle.capacity && (
+                                                    <span className="text-red-600 font-semibold"> (Overload!)</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Assignment Info */}
                                     {isAssigned ? (
                                         <div className="border-t pt-3">
@@ -274,6 +390,18 @@ export const FleetManagement: React.FC = () => {
                                             <p className="text-sm text-gray-700">
                                                 <strong>Armada:</strong> {vehicle?.plateNumber || '-'} ({vehicle?.model || '-'})
                                             </p>
+                                            
+                                            {/* Unassign button - Only if not departed/completed */}
+                                            {route.assignmentStatus !== 'departed' && route.assignmentStatus !== 'completed' && (
+                                                <button
+                                                    onClick={() => handleUnassignRoute(route.id, route.region)}
+                                                    disabled={unassignMutation.isPending}
+                                                    className="w-full bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition mt-3 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                                >
+                                                    <ICONS.trash className="inline mr-2" width={18} height={18} />
+                                                    {unassignMutation.isPending ? 'Membatalkan...' : 'Batal Tugaskan'}
+                                                </button>
+                                            )}
                                         </div>
                                     ) : (
                                         <button
@@ -292,6 +420,18 @@ export const FleetManagement: React.FC = () => {
                                     >
                                         {isExpanded ? 'Sembunyikan Detail' : 'Lihat Detail Pemberhentian'}
                                     </button>
+
+                                    {/* Cancel Route Button - Only for unassigned routes */}
+                                    {(!route.driverId && !route.vehicleId) && (
+                                        <button
+                                            onClick={() => handleCancelRoute(route.id, route.region)}
+                                            disabled={deleteMutation.isPending}
+                                            className="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition mt-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                        >
+                                            <ICONS.trash className="inline mr-2" width={18} height={18} />
+                                            {deleteMutation.isPending ? 'Membatalkan...' : 'Batalkan Rute'}
+                                        </button>
+                                    )}
 
                                     {/* Expanded Details */}
                                     {isExpanded && (

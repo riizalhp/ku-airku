@@ -8,7 +8,8 @@ import { getOrders, createOrder, updateOrder, deleteOrder, batchAssignOrders } f
 import { getStores } from '../../services/storeApiService';
 import { getProducts } from '../../services/productApiService';
 import { getVehicles } from '../../services/vehicleApiService';
-import { createDeliveryRoute } from '../../services/routeApiService';
+import { createDeliveryRoute, getDeliveryRoutes, moveOrder } from '../../services/routeApiService';
+import { RoutePlan } from '../../types';
 
 const EnhancedStatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
     const statusInfo = useMemo(() => {
@@ -236,7 +237,7 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
 
                 <div>
                     <label className="block text-sm font-medium">Produk Tersedia</label>
-                    <div className="space-y-2 mt-1 max-h-32 overflow-y-auto p-2 bg-gray-50 border rounded-md">
+                    <div className="space-y-2 mt-1 p-2 bg-gray-50 border rounded-md">
                         {products.map(p => {
                             const availableStock = p.stock - p.reservedStock;
                             return (<div key={p.id} className="flex justify-between items-center p-2"><p>{p.name}<span className="text-xs text-gray-500 ml-2">(Stok: {availableStock})</span></p><button type="button" onClick={() => handleAddProduct(p)} className="bg-brand-secondary text-white px-2 py-1 rounded text-sm disabled:bg-gray-300" disabled={availableStock <= 0}>{availableStock > 0 ? 'Tambah' : 'Habis'}</button></div>);
@@ -253,7 +254,7 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
                                 <span className="text-center">Jumlah</span>
                                 <span className="text-center">Harga Jual (Rp)</span>
                             </div>
-                            <div className="max-h-48 overflow-y-auto">
+                            <div>
                             {cart.map(item => { 
                                 const p = products.find(prod => prod.id === item.productId); 
                                 if (!p) return null;
@@ -360,15 +361,16 @@ const BatchAssignModal: React.FC<{ isOpen: boolean; onClose: () => void; selecte
     );
 };
 
-const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; pendingOrders: Order[] }> = ({ isOpen, onClose, pendingOrders }) => {
     const queryClient = useQueryClient();
-    const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+    const [filterDate, setFilterDate] = useState<string>('all');
     const [error, setError] = useState('');
 
     const createRouteMutation = useMutation({
         mutationFn: createDeliveryRoute,
         onSuccess: (data) => {
-            alert(data.message || 'Rute optimal berhasil dibuat!');
+            alert(data.message || 'Rute berhasil dibuat!');
             queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             onClose();
@@ -378,29 +380,69 @@ const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({
         },
     });
 
+    // Get unique delivery dates
+    const uniqueDates = useMemo(() => {
+        const dates = pendingOrders
+            .map(o => o.desiredDeliveryDate)
+            .filter((date): date is string => !!date)
+            .filter((date, index, self) => self.indexOf(date) === index)
+            .sort();
+        return dates;
+    }, [pendingOrders]);
+
+    // Filter orders by date
+    const filteredOrders = useMemo(() => {
+        if (filterDate === 'all') return pendingOrders;
+        return pendingOrders.filter(o => o.desiredDeliveryDate === filterDate);
+    }, [pendingOrders, filterDate]);
+
+    const toggleOrderSelection = (orderId: string) => {
+        setSelectedOrderIds(prev =>
+            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedOrderIds.length === filteredOrders.length) {
+            setSelectedOrderIds([]);
+        } else {
+            setSelectedOrderIds(filteredOrders.map(o => o.id));
+        }
+    };
+
     const handleSubmit = () => {
-        if (!deliveryDate) {
-            setError('Harap pilih tanggal pengiriman.');
+        if (selectedOrderIds.length === 0) {
+            setError('Harap pilih minimal 1 pesanan.');
             return;
         }
         setError('');
-        createRouteMutation.mutate({ deliveryDate, assignments: [] });
+        
+        // Get delivery date from first selected order
+        const firstOrder = pendingOrders.find(o => o.id === selectedOrderIds[0]);
+        const deliveryDate = firstOrder?.desiredDeliveryDate || new Date().toISOString().split('T')[0];
+        
+        createRouteMutation.mutate({ 
+            deliveryDate, 
+            assignments: [],
+            selectedOrderIds
+        });
     };
 
     useEffect(() => {
         if (isOpen) {
-            setDeliveryDate(new Date().toISOString().split('T')[0]);
+            setSelectedOrderIds([]);
+            setFilterDate('all');
             setError('');
         }
     }, [isOpen]);
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Buat Rute Optimal">
+        <Modal isOpen={isOpen} onClose={onClose} title="Buat Rute Baru">
             <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                     <p className="text-sm text-gray-700">
-                        Sistem akan membuat rute optimal dari semua pesanan <strong>Pending</strong> untuk tanggal yang dipilih.
-                        Rute akan dikelompokkan per wilayah dan dioptimalkan menggunakan algoritma Clarke-Wright.
+                        Pilih pesanan <strong>Pending</strong> yang ingin digabungkan menjadi satu rute.
+                        Sistem akan mengoptimalkan urutan pemberhentian.
                     </p>
                 </div>
 
@@ -410,14 +452,77 @@ const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({
                     </div>
                 )}
 
+                {/* Filter by Date */}
                 <div>
-                    <label className="block text-sm font-semibold mb-1">Tanggal Pengiriman</label>
-                    <input
-                        type="date"
-                        value={deliveryDate}
-                        onChange={(e) => setDeliveryDate(e.target.value)}
+                    <label className="block text-sm font-semibold mb-2">Filter Tanggal Pengiriman:</label>
+                    <select
+                        value={filterDate}
+                        onChange={(e) => {
+                            setFilterDate(e.target.value);
+                            setSelectedOrderIds([]); // Reset selection when filter changes
+                        }}
                         className="w-full p-2 border rounded-md"
-                    />
+                    >
+                        <option value="all">Semua Tanggal ({pendingOrders.length})</option>
+                        {uniqueDates.map(date => {
+                            const count = pendingOrders.filter(o => o.desiredDeliveryDate === date).length;
+                            return (
+                                <option key={date} value={date}>
+                                    {formatDateDDMMYY(date)} ({count} pesanan)
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+
+                <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-sm font-semibold">
+                        {selectedOrderIds.length} / {filteredOrders.length} dipilih
+                    </span>
+                    <button
+                        onClick={toggleSelectAll}
+                        className="text-sm text-brand-primary hover:underline"
+                    >
+                        {selectedOrderIds.length === filteredOrders.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                    </button>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                    {filteredOrders.length === 0 ? (
+                        <p className="text-center text-gray-500 py-4">
+                            {filterDate === 'all' ? 'Tidak ada pesanan pending' : 'Tidak ada pesanan untuk tanggal ini'}
+                        </p>
+                    ) : (
+                        filteredOrders.map(order => (
+                            <div
+                                key={order.id}
+                                onClick={() => toggleOrderSelection(order.id)}
+                                className={`p-3 border rounded-lg cursor-pointer transition ${
+                                    selectedOrderIds.includes(order.id)
+                                        ? 'border-brand-primary bg-blue-50'
+                                        : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedOrderIds.includes(order.id)}
+                                        onChange={() => {}}
+                                        className="mt-1"
+                                    />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-800">{order.storeName}</p>
+                                        <p className="text-sm text-gray-600">
+                                            {order.items.length} item • Rp {order.totalAmount.toLocaleString()}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Pengiriman: {formatDateDDMMYY(order.desiredDeliveryDate)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 <div className="flex justify-end pt-4 gap-2">
@@ -426,10 +531,212 @@ const CreateRouteModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={createRouteMutation.isPending}
+                        disabled={createRouteMutation.isPending || selectedOrderIds.length === 0}
                         className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark"
                     >
-                        {createRouteMutation.isPending ? 'Membuat Rute...' : 'Buat Rute Optimal'}
+                        {createRouteMutation.isPending ? 'Membuat Rute...' : `Buat Rute (${selectedOrderIds.length})`}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+const MoveOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; order: Order | null; }> = ({ isOpen, onClose, order }) => {
+    const queryClient = useQueryClient();
+    const [selectedRouteId, setSelectedRouteId] = useState<string>('');
+    const [error, setError] = useState('');
+
+    const { data: routes = [] } = useQuery<RoutePlan[]>({
+        queryKey: ['deliveryRoutes'],
+        queryFn: () => getDeliveryRoutes(),
+        enabled: isOpen
+    });
+
+    const moveOrderMutation = useMutation({
+        mutationFn: ({ orderId, newVehicleId }: { orderId: string; newVehicleId: string | null }) =>
+            moveOrder({ orderId, newVehicleId }),
+        onSuccess: () => {
+            alert('Pesanan berhasil dipindahkan!');
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
+            onClose();
+        },
+        onError: (err: any) => {
+            setError(err.response?.data?.message || 'Gagal memindahkan pesanan.');
+        },
+    });
+
+    const handleMove = () => {
+        if (!order) return;
+        
+        if (!selectedRouteId) {
+            setError('Harap pilih rute tujuan.');
+            return;
+        }
+
+        const targetRoute = routes.find(r => r.id === selectedRouteId);
+        if (!targetRoute) {
+            setError('Rute tidak ditemukan.');
+            return;
+        }
+
+        setError('');
+        moveOrderMutation.mutate({
+            orderId: order.id,
+            newVehicleId: targetRoute.vehicleId || null
+        });
+    };
+
+    const handleMoveToPending = () => {
+        if (!order) return;
+        
+        const confirmed = window.confirm(
+            'Apakah Anda yakin ingin mengembalikan pesanan ke status Pending?\n\n' +
+            'Pesanan akan dilepas dari rute dan perlu ditugaskan ulang.'
+        );
+        
+        if (confirmed) {
+            moveOrderMutation.mutate({
+                orderId: order.id,
+                newVehicleId: null
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedRouteId('');
+            setError('');
+        }
+    }, [isOpen]);
+
+    if (!order) return null;
+
+    // Filter routes - exclude the current route
+    const availableRoutes = routes.filter(r => {
+        // Exclude current route
+        const isCurrentRoute = r.stops.some(stop => stop.orderId === order.id);
+        return !isCurrentRoute;
+    });
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Pindah Pesanan ke Rute Lain">
+            <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">Pesanan:</p>
+                    <p className="text-sm text-gray-800">{order.storeName}</p>
+                    <p className="text-xs text-gray-600">ID: {order.id.slice(-8).toUpperCase()}</p>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                        <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-semibold mb-2">Pilih Rute Tujuan:</label>
+                    {availableRoutes.length === 0 ? (
+                        <p className="text-sm text-gray-500 p-4 border rounded-lg">
+                            Tidak ada rute lain yang tersedia. Buat rute baru terlebih dahulu.
+                        </p>
+                    ) : (
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {availableRoutes.map(route => {
+                                const isSelected = selectedRouteId === route.id;
+                                return (
+                                    <div
+                                        key={route.id}
+                                        onClick={() => setSelectedRouteId(route.id)}
+                                        className={`p-4 border-2 rounded-lg cursor-pointer transition ${
+                                            isSelected
+                                                ? 'border-brand-primary bg-blue-50'
+                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        {/* Header */}
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p className="font-bold text-gray-900 text-base">{route.region}</p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Tanggal: {formatDateDDMMYY(route.date)}
+                                                </p>
+                                            </div>
+                                            <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                route.driverId && route.vehicleId 
+                                                    ? 'bg-green-100 text-green-800' 
+                                                    : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {route.driverId && route.vehicleId ? 'Ditugaskan' : 'Belum Ditugaskan'}
+                                            </div>
+                                        </div>
+
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                                            <div className="bg-white p-2 rounded border">
+                                                <p className="text-gray-500">Pemberhentian</p>
+                                                <p className="font-bold text-gray-900">{route.stops.length} toko</p>
+                                            </div>
+                                            <div className="bg-white p-2 rounded border">
+                                                <p className="text-gray-500">Status</p>
+                                                <p className="font-bold text-gray-900 capitalize">{route.assignmentStatus || 'unassigned'}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Stops List (collapsed by default, expanded when selected) */}
+                                        {isSelected && route.stops.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-xs font-semibold text-gray-700 mb-2">
+                                                    Daftar Pemberhentian:
+                                                </p>
+                                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                    {route.stops.map((stop, idx) => (
+                                                        <div key={stop.id} className="text-xs bg-white p-2 rounded border border-gray-100">
+                                                            <span className="font-semibold text-gray-700">{idx + 1}.</span> {stop.storeName}
+                                                            <span className="text-gray-500 ml-1">({stop.orderId.slice(-6).toUpperCase()})</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Click hint */}
+                                        {!isSelected && (
+                                            <p className="text-xs text-gray-400 mt-2 italic">
+                                                Klik untuk melihat detail pemberhentian
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="pt-2 border-t">
+                    <button
+                        onClick={handleMoveToPending}
+                        disabled={moveOrderMutation.isPending}
+                        className="w-full bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 disabled:bg-gray-400"
+                    >
+                        Kembalikan ke Pending
+                    </button>
+                </div>
+
+                <div className="flex justify-end pt-2 gap-2">
+                    <button 
+                        onClick={onClose} 
+                        className="bg-gray-200 font-bold py-2 px-4 rounded-lg hover:bg-gray-300"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleMove}
+                        disabled={moveOrderMutation.isPending || !selectedRouteId}
+                        className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400 hover:bg-brand-dark"
+                    >
+                        {moveOrderMutation.isPending ? 'Memindahkan...' : 'Pindahkan'}
                     </button>
                 </div>
             </div>
@@ -444,7 +751,9 @@ export const OrderManagement: React.FC = () => {
     const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
     const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
     const [isCreateRouteModalOpen, setIsCreateRouteModalOpen] = useState(false);
+    const [isMoveOrderModalOpen, setIsMoveOrderModalOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
+    const [orderToMove, setOrderToMove] = useState<Order | null>(null);
     const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
     const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
@@ -542,7 +851,25 @@ export const OrderManagement: React.FC = () => {
                                         <td className="px-2 py-4"><button onClick={() => toggleExpand(order.id)} className="p-2 rounded-full hover:bg-gray-200" aria-label="Lihat detail"><span className={`transition-transform duration-200 inline-block ${expandedOrderIds.includes(order.id) ? 'rotate-180' : 'rotate-0'}`}><ICONS.chevronDown /></span></button></td>
                                         <td className="px-6 py-4 font-mono text-gray-500"><div className="flex items-center gap-2">{order.priority && <span className="text-yellow-500" title="Prioritas"><ICONS.star width={16} height={16} /></span>}<span>{order.id.slice(-6).toUpperCase()}</span></div></td>
                                         <td className="px-6 py-4 font-medium text-gray-900">{order.storeName}</td><td className="px-6 py-4">{formatDateDDMMYY(order.orderDate)}</td><td className="px-6 py-4">{formatDateDDMMYY(order.desiredDeliveryDate)}</td><td className="px-6 py-4 text-right font-medium">Rp {order.totalAmount.toLocaleString('id-ID')}</td><td className="px-6 py-4">{vehicles.find(v => v.id === order.assignedVehicleId)?.plateNumber || '-'}</td><td className="px-6 py-4"><EnhancedStatusBadge status={order.status} /></td>
-                                        <td className="px-6 py-4"><div className="flex justify-center items-center space-x-2">{order.status === OrderStatus.PENDING && (<><button onClick={() => handleOpenEditModal(order)} className="p-2 text-blue-600 rounded-full hover:bg-blue-100" title="Edit Pesanan"><ICONS.edit width={18} height={18} /></button><button onClick={() => handleDeleteOrder(order.id)} className="p-2 text-red-600 rounded-full hover:bg-red-100" title="Hapus Pesanan"><ICONS.trash width={18} height={18} /></button></>)}</div></td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center items-center space-x-2">
+                                                {order.status === OrderStatus.PENDING && (
+                                                    <>
+                                                        <button onClick={() => handleOpenEditModal(order)} className="p-2 text-blue-600 rounded-full hover:bg-blue-100" title="Edit Pesanan"><ICONS.edit width={18} height={18} /></button>
+                                                        <button onClick={() => handleDeleteOrder(order.id)} className="p-2 text-red-600 rounded-full hover:bg-red-100" title="Hapus Pesanan"><ICONS.trash width={18} height={18} /></button>
+                                                    </>
+                                                )}
+                                                {order.status === OrderStatus.ROUTED && (
+                                                    <button 
+                                                        onClick={() => { setOrderToMove(order); setIsMoveOrderModalOpen(true); }} 
+                                                        className="p-2 text-purple-600 rounded-full hover:bg-purple-100" 
+                                                        title="Pindah Rute"
+                                                    >
+                                                        <ICONS.navigation width={18} height={18} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {expandedOrderIds.includes(order.id) && (
                                         <tr className="bg-gray-50"><td colSpan={10} className="p-0"><div className="p-4 mx-4 my-2 border bg-white rounded-lg shadow-inner"><div className="grid grid-cols-2 gap-4 mb-4 text-xs"><div className="font-semibold text-gray-500">Dipesan oleh: <p className="text-gray-800 font-normal">{order.orderedBy.name} ({order.orderedBy.role})</p></div><div className="font-semibold text-gray-500">Armada Ditugaskan: <p className="text-gray-800 font-normal">{vehicles.find(v => v.id === order.assignedVehicleId)?.plateNumber || 'Belum Ditugaskan'}</p></div></div><h4 className="font-semibold text-gray-800 mb-2 pt-2 border-t">Detail Produk Pesanan:</h4><table className="min-w-full text-xs"><thead className="bg-gray-200"><tr><th className="px-3 py-2 text-left">Produk</th><th className="px-3 py-2 text-center">Jumlah</th><th className="px-3 py-2 text-right">Harga Satuan</th><th className="px-3 py-2 text-right">Subtotal</th></tr></thead><tbody>{order.items.map(item => {const product = products.find(p => p.id === item.productId);if (!product) return <tr key={item.productId}><td colSpan={4} className="p-2 text-center text-red-500">Produk telah dihapus.</td></tr>;const price = item.specialPrice ?? item.originalPrice;const subtotal = price * item.quantity;return (<tr key={item.productId} className="border-b"><td className="px-3 py-2">{product.name}</td><td className="px-3 py-2 text-center">{item.quantity}</td><td className="px-3 py-2 text-right">Rp {price.toLocaleString('id-ID')}</td><td className="px-3 py-2 text-right font-medium">Rp {subtotal.toLocaleString('id-ID')}</td></tr>);})}</tbody></table></div></td></tr>
@@ -556,7 +883,8 @@ export const OrderManagement: React.FC = () => {
             </Card>
             <AddEditOrderModal isOpen={isAddEditModalOpen} onClose={() => setIsAddEditModalOpen(false)} orderToEdit={orderToEdit} vehicles={vehicles} />
             {isBatchAssignModalOpen && <BatchAssignModal isOpen={isBatchAssignModalOpen} onClose={() => setIsBatchAssignModalOpen(false)} selectedOrderIds={selectedOrderIds} vehicles={vehicles} />}
-            {isCreateRouteModalOpen && <CreateRouteModal isOpen={isCreateRouteModalOpen} onClose={() => setIsCreateRouteModalOpen(false)} />}
+            {isCreateRouteModalOpen && <CreateRouteModal isOpen={isCreateRouteModalOpen} onClose={() => setIsCreateRouteModalOpen(false)} pendingOrders={orders.filter(o => o.status === OrderStatus.PENDING)} />}
+            {isMoveOrderModalOpen && <MoveOrderModal isOpen={isMoveOrderModalOpen} onClose={() => setIsMoveOrderModalOpen(false)} order={orderToMove} />}
         </div>
     );
 };

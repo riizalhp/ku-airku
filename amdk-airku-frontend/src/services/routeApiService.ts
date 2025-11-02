@@ -8,7 +8,7 @@ export const getDeliveryRoutes = async (filters: { driverId?: string, date?: str
     return response.data;
 };
 
-export const createDeliveryRoute = async (payload: { deliveryDate: string, assignments: { vehicleId: string, driverId: string }[] }): Promise<{ success: boolean, message: string, routes: RoutePlan[] }> => {
+export const createDeliveryRoute = async (payload: { deliveryDate: string, assignments: { vehicleId: string, driverId: string }[], selectedOrderIds?: string[] }): Promise<{ success: boolean, message: string, routes: RoutePlan[] }> => {
     const response = await api.post('/routes/plan', payload);
     return response.data;
 };
@@ -19,10 +19,15 @@ export const deleteDeliveryRoute = async (routeId: string): Promise<void> => {
 };
 
 export const assignDriverVehicle = async (payload: { routeId: string, vehicleId: string, driverId: string }): Promise<{ success: boolean, message: string }> => {
-    const response = await api.put(`/routes/plan/${payload.routeId}/assign`, {
+    const response = await api.put(`/routes/${payload.routeId}/assign`, {
         vehicleId: payload.vehicleId,
         driverId: payload.driverId
     });
+    return response.data;
+};
+
+export const unassignDriverVehicle = async (routeId: string): Promise<{ success: boolean, message: string }> => {
+    const response = await api.put(`/routes/${routeId}/unassign`);
     return response.data;
 };
 

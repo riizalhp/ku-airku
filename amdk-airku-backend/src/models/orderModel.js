@@ -255,7 +255,7 @@ const Order = {
                 s.lat,
                 s.lng,
                 s.region,
-                SUM(oi.quantity * p.capacityUnit) as demand
+                SUM(oi.quantity * COALESCE(p.capacityConversionHeterogeneous, 1.0)) as demand
             FROM orders o
             JOIN stores s ON o.storeId = s.id
             JOIN order_items oi ON o.id = oi.orderId
@@ -278,7 +278,7 @@ const Order = {
             address: row.address,
             region: row.region,
             location: { lat: parseFloat(row.lat), lng: parseFloat(row.lng) },
-            demand: parseFloat(row.demand),
+            demand: parseFloat(row.demand) || 1,  // Default to 1 if NULL
             priority: row.priority == 1
         }));
     },

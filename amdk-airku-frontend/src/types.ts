@@ -38,8 +38,8 @@ export interface Product {
   price: number;
   stock: number; // Total physical stock
   reservedStock: number; // Stock allocated to pending/routed orders
-  capacityUnit: number; // Kapasitas untuk produk homogen (default 1.0)
-  capacityConversionHeterogeneous?: number; // Konversi untuk produk heterogen
+  capacityUnit?: number; // DEPRECATED: Kapasitas homogen sekarang mengikuti jenis armada, bukan produk
+  capacityConversionHeterogeneous?: number; // Konversi untuk produk heterogen (relatif terhadap 240ml = 1.0)
 }
 
 export enum VehicleStatus {

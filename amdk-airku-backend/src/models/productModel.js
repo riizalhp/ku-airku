@@ -18,12 +18,14 @@ const Product = {
         const { sku, name, price, stock, capacityUnit, capacityConversionHeterogeneous } = productData;
         const id = randomUUID();
         
-        // Gunakan capacityUnit sebagai default jika capacityConversionHeterogeneous tidak ada
-        const conversionHeterogeneous = capacityConversionHeterogeneous || capacityUnit || 1.0;
+        // capacityUnit is deprecated, set to NULL or use for backward compatibility
+        // capacityConversionHeterogeneous is the main field (default 1.0 if not provided)
+        const conversionHeterogeneous = capacityConversionHeterogeneous || 1.0;
+        const capacityUnitValue = capacityUnit !== undefined ? capacityUnit : null;
         
         const query = 'INSERT INTO products (id, sku, name, price, stock, capacityUnit, capacityConversionHeterogeneous, reservedStock) VALUES (?, ?, ?, ?, ?, ?, ?, 0)';
         
-        await pool.query(query, [id, sku, name, price, stock, capacityUnit, conversionHeterogeneous]);
+        await pool.query(query, [id, sku, name, price, stock, capacityUnitValue, conversionHeterogeneous]);
         const [newProduct] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
         return newProduct[0];
     },
@@ -31,14 +33,16 @@ const Product = {
     update: async (id, productData) => {
         const { sku, name, price, stock, capacityUnit, capacityConversionHeterogeneous, reservedStock } = productData;
         
-        // Gunakan capacityUnit sebagai default jika capacityConversionHeterogeneous tidak ada
+        // capacityUnit is deprecated (can be NULL)
+        // capacityConversionHeterogeneous is the main field
         const conversionHeterogeneous = capacityConversionHeterogeneous !== undefined 
             ? capacityConversionHeterogeneous 
-            : capacityUnit || 1.0;
+            : 1.0;
+        const capacityUnitValue = capacityUnit !== undefined ? capacityUnit : null;
         
         const query = 'UPDATE products SET sku = ?, name = ?, price = ?, stock = ?, capacityUnit = ?, capacityConversionHeterogeneous = ?, reservedStock = ? WHERE id = ?';
         
-        await pool.query(query, [sku, name, price, stock, capacityUnit, conversionHeterogeneous, reservedStock, id]);
+        await pool.query(query, [sku, name, price, stock, capacityUnitValue, conversionHeterogeneous, reservedStock, id]);
         return { id, ...productData };
     },
 

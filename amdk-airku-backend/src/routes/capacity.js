@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const capacityController = require('../controllers/capacityController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // Semua endpoint capacity memerlukan autentikasi
-router.use(authenticateToken);
+router.use(protect);
 
 // POST /api/capacity/calculate - Hitung kapasitas kendaraan
 router.post('/calculate', capacityController.calculateCapacity);
