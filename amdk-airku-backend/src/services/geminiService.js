@@ -44,8 +44,9 @@ function fallbackClassifyStoreRegion(storeLocation) {
   // Koordinat referensi: UGM (-7.7710, 110.3775), Depok (-7.7630, 110.3974), Kaliurang (-7.5953, 110.4345)
   // BATAS SELATAN: -7.775 (berbatasan dengan Kota Yogya)
   // BATAS UTARA: -7.50 (sampai lereng Merapi)
-  // Area: Depok, Caturtunggal, Condongcatur, Ngaglik, Mlati, Seyegan, Godean
-  if (lat >= -7.80 && lat <= -7.50 && lng >= 110.25 && lng <= 110.60) {
+  // BATAS BARAT: lng >= 110.30 (tidak termasuk area Kulon Progo di barat)
+  // Area: Depok, Caturtunggal, Condongcatur, Ngaglik, Mlati (timur), Seyegan
+  if (lat >= -7.80 && lat <= -7.50 && lng >= 110.30 && lng <= 110.60) {
     return { region: "Sleman" };
   }
   
@@ -58,9 +59,9 @@ function fallbackClassifyStoreRegion(storeLocation) {
   }
   
   // 4. KULON PROGO - Bagian BARAT DIY (sekitar 586.27 km²)
-  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04)
+  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04), Kalibawang (-7.62, 110.17)
   // PENTING: Kulon Progo mencakup area longitude 110.00 - 110.30
-  // Batas utara diperluas ke -7.60 untuk mencakup seluruh area Kulon Progo termasuk kecamatan di perbatasan dengan Sleman
+  // Batas utara diperluas ke -7.60 untuk mencakup seluruh area Kulon Progo termasuk kecamatan di perbatasan dengan Sleman (seperti Kalibawang)
   // Sub-klasifikasi: Timur dan Barat berdasarkan PDAM Tirta Binangun (110.1486773)
   if (lat >= -8.10 && lat <= -7.60 && lng >= 110.00 && lng <= 110.30) {
     const pdamKulonProgoLongitude = 110.1486773;
@@ -100,9 +101,10 @@ async function classifyStoreRegion(storeLocation) {
     
     2. **Kabupaten Sleman** (Northern DIY - ~574.82 km²)
        - North of Kota Yogyakarta (starts from lat -7.775), extends to Merapi volcano slopes
-       - Bounding box: lat -7.80 to -7.50, lng 110.25 to 110.60
+       - Bounding box: lat -7.80 to -7.50, lng 110.30 to 110.60
        - Key landmarks: UGM (-7.7710, 110.3775), Depok Sleman (-7.7630, 110.3974), Condongcatur (-7.7555, 110.3973), Kaliurang (-7.5953, 110.4345)
        - INCLUDES: Depok, Caturtunggal, UGM area (all are in Sleman, NOT Kota Yogyakarta)
+       - IMPORTANT: Western boundary at lng 110.30 (areas with lng < 110.30 are Kulon Progo, not Sleman)
        - Southern border at -7.775 (border with Kota Yogyakarta)
        - Northern border: Merapi slopes at -7.50
     
@@ -114,11 +116,11 @@ async function classifyStoreRegion(storeLocation) {
        - IMPORTANT: Bantul does NOT include areas with lng < 110.30 (those are Kulon Progo)
     
     4. **Kabupaten Kulon Progo** (Western DIY - ~586.27 km²)
-       - Western part of DIY, includes new YIA airport, Sentolo, Temon, and Wates areas
+       - Western part of DIY, includes new YIA airport, Sentolo, Temon, Kalibawang, and Wates areas
        - Bounding box: lat -8.10 to -7.60, lng 110.00 to 110.30
-       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04)
+       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04), Kalibawang (-7.62, 110.17)
        - IMPORTANT: Kulon Progo covers longitude 110.00 - 110.30 (western part of DIY)
-       - Latitude range extended to -7.60 to cover all northern districts bordering Sleman
+       - Latitude range extended to -7.60 to cover all northern districts like Kalibawang that border Sleman
        - Sub-classification: 'Kulon Progo - Timur' if lng > ${pdamKulonProgoLongitude}, else 'Kulon Progo - Barat'
     
     5. **Kabupaten Gunung Kidul** (Eastern DIY - LARGEST, ~1,485.36 km²)
