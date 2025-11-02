@@ -9,7 +9,13 @@ import { getVehicles, createVehicle, updateVehicle, deleteVehicle } from '../../
 export const VehicleManagement: React.FC = () => {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const initialFormState: Omit<Vehicle, 'id'> = { plateNumber: '', model: '', capacity: 0, status: VehicleStatus.IDLE };
+    const initialFormState: Omit<Vehicle, 'id'> = { 
+        plateNumber: '', 
+        model: '', 
+        capacity: 200, 
+        status: VehicleStatus.IDLE,
+        vehicleType: 'L300'
+    };
     const [currentVehicle, setCurrentVehicle] = useState<Omit<Vehicle, 'id'> | Vehicle>(initialFormState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -73,7 +79,21 @@ export const VehicleManagement: React.FC = () => {
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setCurrentVehicle(prev => ({ ...prev, [name]: (name === 'capacity') ? parseFloat(value) || 0 : value }));
+        
+        // Auto-set capacity based on vehicleType
+        if (name === 'vehicleType') {
+            const capacity = value === 'Cherry Box' ? 170 : 200;
+            setCurrentVehicle(prev => ({ 
+                ...prev, 
+                vehicleType: value,
+                capacity: capacity
+            }));
+        } else {
+            setCurrentVehicle(prev => ({ 
+                ...prev, 
+                [name]: (name === 'capacity') ? parseFloat(value) || 0 : value 
+            }));
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -116,17 +136,23 @@ export const VehicleManagement: React.FC = () => {
                             <tr>
                                 <th scope="col" className="px-6 py-3">Plat Nomor</th>
                                 <th scope="col" className="px-6 py-3">Model</th>
+                                <th scope="col" className="px-6 py-3">Tipe Kendaraan</th>
                                 <th scope="col" className="px-6 py-3 text-right">Kapasitas</th>
                                 <th scope="col" className="px-6 py-3">Status</th>
                                 <th scope="col" className="px-6 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (<tr><td colSpan={5} className="text-center p-4">Memuat data...</td></tr>) : 
+                            {isLoading ? (<tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>) : 
                              filteredVehicles.map((vehicle) => (
                                 <tr key={vehicle.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{vehicle.plateNumber}</td>
                                     <td className="px-6 py-4">{vehicle.model}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                            {vehicle.vehicleType || 'L300'}
+                                        </span>
+                                    </td>
                                     <td className="px-6 py-4 text-right">{vehicle.capacity} unit</td>
                                     <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{vehicle.status}</span></td>
                                     <td className="px-6 py-4 flex justify-center space-x-2">
@@ -144,12 +170,83 @@ export const VehicleManagement: React.FC = () => {
             <Modal title={isEditing ? "Edit Armada" : "Tambah Armada Baru"} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {apiError && <p className="text-sm text-red-600 bg-red-100 p-2 rounded">{apiError}</p>}
-                    <input type="text" name="plateNumber" placeholder="Plat Nomor" value={currentVehicle.plateNumber} onChange={handleInputChange} className="w-full p-2 border rounded" required />
-                    <input type="text" name="model" placeholder="Model Kendaraan" value={currentVehicle.model} onChange={handleInputChange} className="w-full p-2 border rounded" required />
-                    <input type="number" name="capacity" placeholder="Kapasitas (Unit)" value={currentVehicle.capacity} onChange={handleInputChange} className="w-full p-2 border rounded" required />
-                    <select name="status" value={currentVehicle.status} onChange={handleInputChange} className="w-full p-2 border rounded bg-white">
-                        {Object.values(VehicleStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    
+                    <div>
+                        <label htmlFor="plateNumber" className="block text-sm font-medium text-gray-700">Plat Nomor</label>
+                        <input 
+                            type="text" 
+                            id="plateNumber"
+                            name="plateNumber" 
+                            placeholder="AB 1234 CD" 
+                            value={currentVehicle.plateNumber} 
+                            onChange={handleInputChange} 
+                            className="mt-1 w-full p-2 border rounded" 
+                            required 
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="model" className="block text-sm font-medium text-gray-700">Model Kendaraan</label>
+                        <input 
+                            type="text" 
+                            id="model"
+                            name="model" 
+                            placeholder="Suzuki APV" 
+                            value={currentVehicle.model} 
+                            onChange={handleInputChange} 
+                            className="mt-1 w-full p-2 border rounded" 
+                            required 
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="vehicleType" className="block text-sm font-medium text-gray-700">
+                            Tipe Kendaraan
+                            <span className="text-xs text-gray-500 block mt-0.5">Menentukan kapasitas maksimal</span>
+                        </label>
+                        <select 
+                            id="vehicleType"
+                            name="vehicleType" 
+                            value={currentVehicle.vehicleType || 'L300'} 
+                            onChange={handleInputChange} 
+                            className="mt-1 w-full p-2 border rounded bg-white"
+                            required
+                        >
+                            <option value="L300">L300 (Kapasitas: 200 setara 240ml)</option>
+                            <option value="Cherry Box">Cherry Box (Kapasitas: 170 setara 240ml)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label htmlFor="capacity" className="block text-sm font-medium text-gray-700">
+                            Kapasitas (Unit Setara 240ml)
+                            <span className="text-xs text-gray-500 block mt-0.5">Auto-set berdasarkan tipe kendaraan</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="capacity"
+                            name="capacity" 
+                            placeholder="200" 
+                            value={currentVehicle.capacity} 
+                            onChange={handleInputChange} 
+                            className="mt-1 w-full p-2 border rounded bg-gray-50" 
+                            readOnly
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                        <select 
+                            id="status"
+                            name="status" 
+                            value={currentVehicle.status} 
+                            onChange={handleInputChange} 
+                            className="mt-1 w-full p-2 border rounded bg-white"
+                        >
+                            {Object.values(VehicleStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+
                     <div className="flex justify-end pt-4">
                          <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 py-2 px-4 rounded-lg mr-2">Batal</button>
                         <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-brand-primary text-white py-2 px-4 rounded-lg">

@@ -13,6 +13,7 @@ import { VisitSchedule } from './VisitSchedule';
 import { ReportsView } from './ReportsView';
 import { useAppContext } from '../../hooks/useAppContext';
 import { TripHistory } from './TripHistory';
+import { CapacityCalculator } from './CapacityCalculator';
 
 // Menu items are ordered based on the admin's typical workflow.
 const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
@@ -34,6 +35,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     { path: 'products', label: 'Manajemen Produk', icon: <ICONS.product /> },
     { path: 'vehicles', label: 'Manajemen Armada', icon: <ICONS.fleet /> },
     { path: 'users', label: 'Manajemen Pengguna', icon: <ICONS.users /> },
+    { path: 'capacity-calculator', label: 'Kalkulator Kapasitas', icon: <ICONS.dashboard /> },
 ];
 
 
@@ -128,6 +130,7 @@ export const AdminView: React.FC = () => {
                         <Route path="fleet" element={<FleetManagement />} />
                         <Route path="schedule" element={<VisitSchedule />} />
                         <Route path="surveys" element={<SurveyReports />} />
+                        <Route path="capacity-calculator" element={<CapacityCalculator />} />
                         <Route path="*" element={<Navigate to="/admin" replace />} />
                     </Routes>
                 </div>

@@ -52,8 +52,9 @@ export interface Vehicle {
   id: string;
   plateNumber: string;
   model: string;
-  capacity: number; // in gallons/units
+  capacity: number; // Kapasitas maksimal (setara 240ml)
   status: VehicleStatus;
+  vehicleType?: string; // 'L300' | 'Cherry Box'
 }
 
 export enum OrderStatus {
