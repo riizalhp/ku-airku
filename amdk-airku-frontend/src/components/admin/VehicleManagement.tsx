@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
+import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
 import { ICONS } from '../../constants';
 import { Vehicle, VehicleStatus } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -19,6 +20,8 @@ export const VehicleManagement: React.FC = () => {
     const [currentVehicle, setCurrentVehicle] = useState<Omit<Vehicle, 'id'> | Vehicle>(initialFormState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
     const [apiError, setApiError] = useState<string | null>(null);
 
     const { data: vehicles = [], isLoading } = useQuery<Vehicle[]>({
@@ -62,6 +65,19 @@ export const VehicleManagement: React.FC = () => {
                    vehicle.model.toLowerCase().includes(term);
         });
     }, [vehicles, searchTerm]);
+
+    const paginatedVehicles = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredVehicles.slice(startIndex, endIndex);
+    }, [filteredVehicles, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const openModalForAdd = () => {
         setIsEditing(false);
@@ -129,6 +145,16 @@ export const VehicleManagement: React.FC = () => {
                 />
             </Card>
 
+            <div className="flex justify-end mb-4">
+                <ItemsPerPageSelector
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={(value) => {
+                        setItemsPerPage(value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
             <Card className="!p-0">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700">
@@ -144,7 +170,7 @@ export const VehicleManagement: React.FC = () => {
                         </thead>
                         <tbody>
                             {isLoading ? (<tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>) : 
-                             filteredVehicles.map((vehicle) => (
+                             paginatedVehicles.map((vehicle) => (
                                 <tr key={vehicle.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{vehicle.plateNumber}</td>
                                     <td className="px-6 py-4">{vehicle.model}</td>
@@ -163,9 +189,19 @@ export const VehicleManagement: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                     {!isLoading && filteredVehicles.length === 0 && <p className="text-center text-gray-500 py-6">Tidak ada data armada.</p>}
+                     {!isLoading && paginatedVehicles.length === 0 && <p className="text-center text-gray-500 py-6">Tidak ada data armada.</p>}
                 </div>
             </Card>
+
+            {!isLoading && filteredVehicles.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredVehicles.length}
+                />
+            )}
 
             <Modal title={isEditing ? "Edit Armada" : "Tambah Armada Baru"} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
+import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
 import { ICONS } from '../../constants';
 import { Store, Coordinate } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -26,6 +27,8 @@ export const StoreManagement: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('all');
     const [filterPartnerStatus, setFilterPartnerStatus] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     const { data: stores = [], isLoading } = useQuery<Store[]>({
         queryKey: ['stores'],
@@ -108,6 +111,19 @@ export const StoreManagement: React.FC = () => {
         // Sort by 'subscribedSince' date descending, so newest are first.
         return filtered.sort((a, b) => new Date(b.subscribedSince).getTime() - new Date(a.subscribedSince).getTime());
     }, [stores, searchTerm, filterRegion, filterPartnerStatus]);
+
+    const paginatedStores = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredStores.slice(startIndex, endIndex);
+    }, [filteredStores, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterRegion, filterPartnerStatus]);
     
     const resetForm = () => {
         setIsEditing(false);
@@ -219,6 +235,16 @@ export const StoreManagement: React.FC = () => {
                 </div>
             </Card>
 
+            <div className="flex justify-end mb-4">
+                <ItemsPerPageSelector
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={(value) => {
+                        setItemsPerPage(value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
             <Card className="!p-0">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700">
@@ -226,7 +252,7 @@ export const StoreManagement: React.FC = () => {
                             <tr><th scope="col" className="px-6 py-3">Nama Toko</th><th scope="col" className="px-6 py-3">Pemilik</th><th scope="col" className="px-6 py-3">Wilayah</th><th scope="col" className="px-6 py-3">Status Mitra</th><th scope="col" className="px-6 py-3">Telepon</th><th scope="col" className="px-6 py-3">Aksi</th></tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (<tr><td colSpan={6} className="text-center p-4">Memuat data toko...</td></tr>) : filteredStores.map((store: Store) => (
+                            {isLoading ? (<tr><td colSpan={6} className="text-center p-4">Memuat data toko...</td></tr>) : paginatedStores.map((store: Store) => (
                                 <tr key={store.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{store.name}</td>
                                     <td className="px-6 py-4">{store.owner}</td>
@@ -241,9 +267,19 @@ export const StoreManagement: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                    {!isLoading && filteredStores.length === 0 && (<p className="text-center text-gray-500 py-6">Tidak ada toko ditemukan.</p>)}
+                    {!isLoading && paginatedStores.length === 0 && (<p className="text-center text-gray-500 py-6">Tidak ada toko ditemukan.</p>)}
                 </div>
             </Card>
+
+            {!isLoading && filteredStores.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredStores.length}
+                />
+            )}
 
              <Modal title={isEditing ? "Edit Toko" : "Tambah Toko Baru"} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-4">

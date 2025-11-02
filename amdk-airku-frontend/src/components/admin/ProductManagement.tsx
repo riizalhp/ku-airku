@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
+import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
 import { ICONS } from '../../constants';
 import { Product } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -20,6 +21,8 @@ export const ProductManagement: React.FC = () => {
     const [currentProduct, setCurrentProduct] = useState<Omit<Product, 'id' | 'reservedStock'> | Product>(initialFormState);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
     const [apiError, setApiError] = useState<string | null>(null);
     const [autoCalculate, setAutoCalculate] = useState(true);
     const [capacityPreview, setCapacityPreview] = useState<string>('');
@@ -65,6 +68,19 @@ export const ProductManagement: React.FC = () => {
                    product.sku.toLowerCase().includes(term);
         });
     }, [products, searchTerm]);
+
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredProducts.slice(startIndex, endIndex);
+    }, [filteredProducts, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const openModalForAdd = () => {
         setIsEditing(false);
@@ -163,6 +179,16 @@ export const ProductManagement: React.FC = () => {
                 </div>
             </Card>
 
+            <div className="flex justify-end mb-4">
+                <ItemsPerPageSelector
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={(value) => {
+                        setItemsPerPage(value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
             <Card className="!p-0">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700">
@@ -178,7 +204,7 @@ export const ProductManagement: React.FC = () => {
                         <tbody>
                             {isLoading ? (
                                 <tr><td colSpan={5} className="text-center p-4">Memuat produk...</td></tr>
-                            ) : filteredProducts.map((product: Product) => (
+                            ) : paginatedProducts.map((product: Product) => (
                                 <tr key={product.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-6 py-4 font-mono text-gray-500">{product.sku}</td>
                                     <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
@@ -203,11 +229,21 @@ export const ProductManagement: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                     {!isLoading && filteredProducts.length === 0 && (
+                     {!isLoading && paginatedProducts.length === 0 && (
                         <p className="text-center text-gray-500 py-6">Tidak ada produk ditemukan.</p>
                     )}
                 </div>
             </Card>
+
+            {!isLoading && filteredProducts.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredProducts.length}
+                />
+            )}
 
             <Modal title={isEditing ? "Edit Produk" : "Tambah Produk Baru"} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-4">

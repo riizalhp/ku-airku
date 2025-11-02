@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
+import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
 import { ICONS } from '../../constants';
 import { User, Role } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -18,6 +19,8 @@ export const UserManagement: React.FC = () => {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState<Role | 'all'>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     const { data: users = [], isLoading } = useQuery<User[]>({
         queryKey: ['users'],
@@ -70,6 +73,19 @@ export const UserManagement: React.FC = () => {
             return searchMatch && roleMatch;
         });
     }, [users, searchTerm, filterRole]);
+
+    const paginatedUsers = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredUsers.slice(startIndex, endIndex);
+    }, [filteredUsers, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterRole]);
 
     const openModalForAdd = () => {
         setIsEditing(false);
@@ -149,6 +165,16 @@ export const UserManagement: React.FC = () => {
                 </div>
             </Card>
 
+            <div className="flex justify-end mb-4">
+                <ItemsPerPageSelector
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={(value) => {
+                        setItemsPerPage(value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
             <Card className="!p-0">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700">
@@ -163,7 +189,7 @@ export const UserManagement: React.FC = () => {
                         <tbody>
                             {isLoading ? (
                                 <tr><td colSpan={4} className="text-center p-4">Loading users...</td></tr>
-                            ) : filteredUsers.map((user: User) => {
+                            ) : paginatedUsers.map((user: User) => {
                                 const isSelf = loggedInUser?.id === user.id;
                                 return (
                                 <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
@@ -188,11 +214,21 @@ export const UserManagement: React.FC = () => {
                             )})}
                         </tbody>
                     </table>
-                    {!isLoading && filteredUsers.length === 0 && (
+                    {!isLoading && paginatedUsers.length === 0 && (
                         <p className="text-center text-gray-500 py-6">Tidak ada pengguna yang cocok dengan filter.</p>
                     )}
                 </div>
             </Card>
+
+            {!isLoading && filteredUsers.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredUsers.length}
+                />
+            )}
 
             <Modal title={isEditing ? "Edit User" : "Add New User"} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <form onSubmit={handleSubmit} className="space-y-4">

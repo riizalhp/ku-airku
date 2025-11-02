@@ -10,6 +10,7 @@ import { getProducts } from '../../services/productApiService';
 import { getVehicles } from '../../services/vehicleApiService';
 import { createDeliveryRoute, getDeliveryRoutes, moveOrder } from '../../services/routeApiService';
 import { RoutePlan } from '../../types';
+import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
 
 const EnhancedStatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
     const statusInfo = useMemo(() => {
@@ -748,6 +749,8 @@ export const OrderManagement: React.FC = () => {
     const queryClient = useQueryClient();
     const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
     const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
     const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
     const [isCreateRouteModalOpen, setIsCreateRouteModalOpen] = useState(false);
@@ -784,6 +787,19 @@ export const OrderManagement: React.FC = () => {
             (searchTerm === '' || order.storeName.toLowerCase().includes(searchTerm.toLowerCase()) || order.id.toLowerCase().includes(searchTerm.toLowerCase()))
         ).sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     }, [orders, filterStatus, searchTerm]);
+
+    const paginatedOrders = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredOrders.slice(startIndex, endIndex);
+    }, [filteredOrders, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterStatus, searchTerm]);
 
     const handleSelectOrder = (orderId: string) => {
         setSelectedOrderIds(prev =>
@@ -832,6 +848,16 @@ export const OrderManagement: React.FC = () => {
             
             <Card><div className={`grid grid-cols-1 md:grid-cols-2 gap-4`}><div><label className="text-sm font-medium">Pencarian</label><input type="text" placeholder="Cari toko atau ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-2 border rounded-md mt-1"/></div><div><label className="text-sm font-medium">Status</label><select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)} className="w-full p-2 border rounded-md mt-1"><option value="all">Semua Status</option>{Object.values(OrderStatus).map(s => <option key={s} value={s}>{s}</option>)}</select></div></div></Card>
 
+            <div className="flex justify-end mb-4">
+                <ItemsPerPageSelector
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={(value) => {
+                        setItemsPerPage(value);
+                        setCurrentPage(1);
+                    }}
+                />
+            </div>
+
             <Card className="!p-0 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700">
@@ -844,7 +870,7 @@ export const OrderManagement: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (<tr><td colSpan={10} className="text-center p-6">Memuat pesanan...</td></tr>) : filteredOrders.map(order => (
+                            {isLoading ? (<tr><td colSpan={10} className="text-center p-6">Memuat pesanan...</td></tr>) : paginatedOrders.map(order => (
                                 <React.Fragment key={order.id}>
                                     <tr className={`bg-white border-b hover:bg-gray-50 ${order.priority ? 'bg-yellow-50' : ''}`}>
                                         <td className="px-4 py-3">{order.status === OrderStatus.PENDING && (<input type="checkbox" className="h-4 w-4 rounded" checked={selectedOrderIds.includes(order.id)} onChange={() => handleSelectOrder(order.id)} aria-label={`Select order ${order.id}`}/>)}</td>
@@ -878,9 +904,20 @@ export const OrderManagement: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                    {!isLoading && filteredOrders.length === 0 && <p className="text-center text-gray-500 py-8">Tidak ada pesanan ditemukan.</p>}
+                    {!isLoading && paginatedOrders.length === 0 && <p className="text-center text-gray-500 py-8">Tidak ada pesanan ditemukan.</p>}
                 </div>
             </Card>
+
+            {!isLoading && filteredOrders.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredOrders.length}
+                />
+            )}
+
             <AddEditOrderModal isOpen={isAddEditModalOpen} onClose={() => setIsAddEditModalOpen(false)} orderToEdit={orderToEdit} vehicles={vehicles} />
             {isBatchAssignModalOpen && <BatchAssignModal isOpen={isBatchAssignModalOpen} onClose={() => setIsBatchAssignModalOpen(false)} selectedOrderIds={selectedOrderIds} vehicles={vehicles} />}
             {isCreateRouteModalOpen && <CreateRouteModal isOpen={isCreateRouteModalOpen} onClose={() => setIsCreateRouteModalOpen(false)} pendingOrders={orders.filter(o => o.status === OrderStatus.PENDING)} />}
