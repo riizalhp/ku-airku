@@ -196,9 +196,180 @@ const getCapacityRecommendation = (productSize) => {
     };
 };
 
+/**
+ * Data kapasitas kendaraan berdasarkan jenis produk
+ */
+const VEHICLE_CAPACITY_DATA = {
+    'L300': {
+        maxCapacityEquivalent: 200, // Setara 240ml
+        homogeneousCapacity: {
+            '240ml': 200,
+            '120ml': 350,
+            '600ml': 150,
+            '330ml': 200,
+            '19L': 60
+        },
+        conversionRates: {
+            '240ml': 1.0,
+            '120ml': 0.571,
+            '600ml': 1.6,
+            '330ml': 1.0,
+            '19L': 3.33
+        }
+    },
+    'Cherry Box': {
+        maxCapacityEquivalent: 170,
+        homogeneousCapacity: {
+            '240ml': 170,
+            '120ml': 300,
+            '600ml': 100,
+            '330ml': 170,
+            '19L': 50
+        },
+        conversionRates: {
+            '240ml': 1.0,
+            '120ml': 0.571,
+            '600ml': 1.6,
+            '330ml': 1.0,
+            '19L': 3.33
+        }
+    }
+};
+
+/**
+ * Menghitung kapasitas kendaraan dengan aturan homogeneous dan heterogeneous
+ * @param {Array} products - Array of {productType: '240ml', quantity: number}
+ * @param {string} vehicleType - 'L300' atau 'Cherry Box'
+ * @returns {Object} - Detail perhitungan kapasitas
+ */
+const calculateVehicleLoad = (products, vehicleType = 'L300') => {
+    if (!VEHICLE_CAPACITY_DATA[vehicleType]) {
+        throw new Error(`Vehicle type ${vehicleType} tidak dikenali`);
+    }
+
+    const vehicleData = VEHICLE_CAPACITY_DATA[vehicleType];
+    const maxCapacity = vehicleData.maxCapacityEquivalent;
+    
+    // Cek apakah homogeneous (1 jenis produk)
+    const isHomogeneous = products.length === 1;
+
+    if (isHomogeneous) {
+        // ATURAN 1 & 6: Hanya 1 jenis produk
+        const product = products[0];
+        const productType = product.productType;
+        const requestedQuantity = product.quantity;
+        const maxAllowed = vehicleData.homogeneousCapacity[productType];
+
+        if (!maxAllowed) {
+            throw new Error(`Product type ${productType} tidak dikenali untuk ${vehicleType}`);
+        }
+
+        // Batasi sampai kapasitas maksimal tanpa perhitungan proporsional
+        const approvedQuantity = Math.min(requestedQuantity, maxAllowed);
+        const conversionRate = vehicleData.conversionRates[productType];
+        const totalLoad = approvedQuantity * conversionRate;
+        const remainingCapacity = maxCapacity - totalLoad;
+
+        return {
+            isHomogeneous: true,
+            vehicleType,
+            maxCapacity,
+            products: [{
+                productType,
+                requestedQuantity,
+                approvedQuantity,
+                conversionRate,
+                loadEquivalent: totalLoad,
+                isReduced: requestedQuantity > maxAllowed
+            }],
+            totalLoadEquivalent: Math.round(totalLoad * 100) / 100,
+            remainingCapacity: Math.round(remainingCapacity * 100) / 100,
+            utilizationPercentage: Math.round((totalLoad / maxCapacity) * 10000) / 100,
+            canFit: approvedQuantity === requestedQuantity,
+            message: requestedQuantity > maxAllowed 
+                ? `Jumlah ${productType} dikurangi dari ${requestedQuantity} menjadi ${approvedQuantity} (batas maksimal ${vehicleType})`
+                : `Semua ${productType} dapat dimuat (${approvedQuantity} unit)`
+        };
+    } else {
+        // ATURAN 2, 3, 4: Beberapa jenis produk (heterogeneous)
+        let totalLoad = 0;
+        const productDetails = [];
+
+        // Hitung total beban
+        products.forEach(product => {
+            const conversionRate = vehicleData.conversionRates[product.productType];
+            if (!conversionRate) {
+                throw new Error(`Product type ${product.productType} tidak dikenali`);
+            }
+            const load = product.quantity * conversionRate;
+            totalLoad += load;
+            productDetails.push({
+                productType: product.productType,
+                requestedQuantity: product.quantity,
+                conversionRate,
+                loadEquivalent: load
+            });
+        });
+
+        // Cek apakah melebihi batas
+        const exceedsCapacity = totalLoad > maxCapacity;
+
+        if (exceedsCapacity) {
+            // ATURAN 4: Kurangi secara proporsional
+            const reductionFactor = maxCapacity / totalLoad;
+            
+            productDetails.forEach(detail => {
+                detail.approvedQuantity = Math.floor(detail.requestedQuantity * reductionFactor);
+                detail.loadEquivalent = detail.approvedQuantity * detail.conversionRate;
+                detail.isReduced = true;
+            });
+
+            // Recalculate total load setelah pengurangan
+            totalLoad = productDetails.reduce((sum, d) => sum + d.loadEquivalent, 0);
+        } else {
+            // Semua produk bisa dimuat
+            productDetails.forEach(detail => {
+                detail.approvedQuantity = detail.requestedQuantity;
+                detail.isReduced = false;
+            });
+        }
+
+        const remainingCapacity = maxCapacity - totalLoad;
+
+        return {
+            isHomogeneous: false,
+            vehicleType,
+            maxCapacity,
+            products: productDetails,
+            totalLoadEquivalent: Math.round(totalLoad * 100) / 100,
+            remainingCapacity: Math.round(remainingCapacity * 100) / 100,
+            utilizationPercentage: Math.round((totalLoad / maxCapacity) * 10000) / 100,
+            canFit: !exceedsCapacity,
+            message: exceedsCapacity
+                ? `Muatan dikurangi secara proporsional agar sesuai kapasitas ${vehicleType} (${maxCapacity} setara 240ml)`
+                : `Semua produk dapat dimuat dalam ${vehicleType}`
+        };
+    }
+};
+
+/**
+ * Mendapatkan info kapasitas kendaraan
+ * @param {string} vehicleType - 'L300' atau 'Cherry Box'
+ * @returns {Object} - Info kapasitas kendaraan
+ */
+const getVehicleCapacityInfo = (vehicleType = 'L300') => {
+    if (!VEHICLE_CAPACITY_DATA[vehicleType]) {
+        throw new Error(`Vehicle type ${vehicleType} tidak dikenali`);
+    }
+    return VEHICLE_CAPACITY_DATA[vehicleType];
+};
+
 module.exports = {
     calculateOrderCapacity,
     calculateMaxUnits,
     validateMultipleOrders,
-    getCapacityRecommendation
+    getCapacityRecommendation,
+    calculateVehicleLoad,
+    getVehicleCapacityInfo,
+    VEHICLE_CAPACITY_DATA
 };
