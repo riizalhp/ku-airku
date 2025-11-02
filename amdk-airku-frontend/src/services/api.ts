@@ -1,7 +1,26 @@
 import axios from 'axios';
 
+// Deteksi API URL berdasarkan environment atau gunakan IP local
+// Untuk development, bisa gunakan VITE_API_URL dari .env
+// Atau otomatis gunakan host yang sama dengan frontend
+const getApiBaseUrl = () => {
+  // Cek environment variable dulu
+  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envApiUrl) {
+    return envApiUrl;
+  }
+  
+  // Jika diakses dari network (bukan localhost), gunakan host yang sama
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `http://${window.location.hostname}:3001/api`;
+  }
+  
+  // Default ke localhost
+  return 'http://localhost:3001/api';
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api', // Adjust if your backend runs on a different port
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

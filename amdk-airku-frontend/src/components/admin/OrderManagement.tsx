@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
-import { Order, OrderStatus, Store, Product, Vehicle, VehicleStatus } from '../../types';
+import { Order, OrderStatus, Store, Product, Vehicle } from '../../types';
 import { ICONS } from '../../constants';
 import { Modal } from '../ui/Modal';
-import { getOrders, createOrder, updateOrder, deleteOrder, batchAssignOrders } from '../../services/orderApiService';
+import { getOrders, createOrder, updateOrder, deleteOrder } from '../../services/orderApiService';
 import { getStores } from '../../services/storeApiService';
 import { getProducts } from '../../services/productApiService';
 import { getVehicles } from '../../services/vehicleApiService';
@@ -156,6 +156,10 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
         });
     };
 
+    const handleRemoveFromCart = (productId: string) => {
+        setCart(prevCart => prevCart.filter(item => item.productId !== productId));
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setApiError('');
@@ -250,10 +254,11 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
                     <div>
                         <label className="block text-sm font-medium">Keranjang</label>
                         <div className="space-y-2 mt-1 border p-3 rounded-lg">
-                             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-start text-xs font-bold text-gray-600 px-1 pb-1 border-b">
+                             <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start text-xs font-bold text-gray-600 px-1 pb-1 border-b">
                                 <span className="md:col-span-2">Produk</span>
                                 <span className="text-center">Jumlah</span>
                                 <span className="text-center">Harga Jual (Rp)</span>
+                                <span className="text-center">Aksi</span>
                             </div>
                             <div>
                             {cart.map(item => { 
@@ -272,7 +277,7 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
                                 }
 
                                 return (
-                                <div key={item.productId} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-start py-2 border-b">
+                                <div key={item.productId} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start py-2 border-b">
                                     <div className="md:col-span-2">
                                         <p className="text-sm font-semibold">{p.name}</p>
                                         <p className="text-xs text-gray-400">Normal: {item.originalPrice.toLocaleString('id-ID')}</p>
@@ -285,6 +290,16 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
                                         <label className="text-xs md:hidden">Harga Jual</label>
                                         <input type="number" min="0" value={displayPrice} onChange={e => handleUpdateCart(item.productId, 'specialPrice', parseInt(e.target.value) || 0)} className="w-full p-1 border rounded text-center"/>
                                         {profitText}
+                                    </div>
+                                    <div className="flex justify-center items-start">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveFromCart(item.productId)}
+                                            className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition-colors"
+                                            title="Hapus produk"
+                                        >
+                                            <ICONS.trash width={16} height={16} />
+                                        </button>
                                     </div>
                                 </div>
                                 ); 
@@ -306,58 +321,6 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
 
                 <div className="flex justify-end pt-4"><button type="button" onClick={onClose} className="bg-gray-200 font-bold py-2 px-4 rounded-lg mr-2">Batal</button><button type="submit" disabled={isCreating || isUpdating} className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400">{isCreating || isUpdating ? 'Menyimpan...' : (orderToEdit ? 'Simpan' : 'Buat')}</button></div>
             </form>
-        </Modal>
-    );
-};
-
-const BatchAssignModal: React.FC<{ isOpen: boolean; onClose: () => void; selectedOrderIds: string[]; vehicles: Vehicle[]; }> = ({ isOpen, onClose, selectedOrderIds, vehicles }) => {
-    const queryClient = useQueryClient();
-    const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-    const [vehicleId, setVehicleId] = useState('');
-
-    const batchAssignMutation = useMutation({
-        mutationFn: batchAssignOrders,
-        onSuccess: (data) => {
-            alert(data.message);
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
-            onClose();
-        },
-        onError: (err: any) => {
-            alert(err.response?.data?.message || 'Gagal menugaskan pesanan.');
-        },
-    });
-
-    const handleSubmit = () => {
-        if (!vehicleId || !deliveryDate || selectedOrderIds.length === 0) {
-            alert('Harap pilih armada dan tanggal pengiriman.');
-            return;
-        }
-        batchAssignMutation.mutate({ orderIds: selectedOrderIds, vehicleId: vehicleId, deliveryDate: deliveryDate });
-    };
-
-    return (
-        <Modal title={`Tugaskan ${selectedOrderIds.length} Pesanan`} isOpen={isOpen} onClose={onClose}>
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm font-medium">Tanggal Pengiriman</label>
-                    <input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} className="w-full p-2 border rounded-md mt-1" />
-                </div>
-                <div>
-                    <label className="text-sm font-medium">Pilih Armada</label>
-                    <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} className="w-full p-2 border rounded-md mt-1 bg-white">
-                        <option value="" disabled>-- Pilih Armada --</option>
-                        {vehicles.filter(v => v.status === VehicleStatus.IDLE).map(v => (
-                            <option key={v.id} value={v.id}>{v.plateNumber}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex justify-end pt-4">
-                    <button onClick={onClose} className="bg-gray-200 font-bold py-2 px-4 rounded-lg mr-2">Batal</button>
-                    <button onClick={handleSubmit} disabled={batchAssignMutation.isPending} className="w-full bg-brand-primary text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-400">
-                        {batchAssignMutation.isPending ? 'Menugaskan...' : `Tugaskan`}
-                    </button>
-                </div>
-            </div>
         </Modal>
     );
 };
@@ -752,13 +715,11 @@ export const OrderManagement: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
     const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
-    const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
     const [isCreateRouteModalOpen, setIsCreateRouteModalOpen] = useState(false);
     const [isMoveOrderModalOpen, setIsMoveOrderModalOpen] = useState(false);
     const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
     const [orderToMove, setOrderToMove] = useState<Order | null>(null);
     const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
-    const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery<Order[]>({ queryKey: ['orders'], queryFn: getOrders });
     const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({ queryKey: ['vehicles'], queryFn: getVehicles });
@@ -801,21 +762,6 @@ export const OrderManagement: React.FC = () => {
         setCurrentPage(1);
     }, [filterStatus, searchTerm]);
 
-    const handleSelectOrder = (orderId: string) => {
-        setSelectedOrderIds(prev =>
-            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
-        );
-    };
-    
-    const handleSelectAllPending = () => {
-        const pendingOrders = filteredOrders.filter(o => o.status === OrderStatus.PENDING);
-        if (selectedOrderIds.length === pendingOrders.length) {
-            setSelectedOrderIds([]);
-        } else {
-            setSelectedOrderIds(pendingOrders.map(o => o.id));
-        }
-    };
-
     const handleOpenAddModal = () => { setOrderToEdit(null); setIsAddEditModalOpen(true); };
     const handleOpenEditModal = (order: Order) => { setOrderToEdit(order); setIsAddEditModalOpen(true); };
     const handleDeleteOrder = (orderId: string) => { if (window.confirm('Anda yakin ingin menghapus pesanan ini?')) deleteMutate(orderId); };
@@ -833,11 +779,6 @@ export const OrderManagement: React.FC = () => {
                             className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"
                         >
                             <ICONS.route /> Buat Rute Optimal
-                        </button>
-                    )}
-                    {selectedOrderIds.length > 0 && (
-                        <button onClick={() => setIsBatchAssignModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
-                            <ICONS.checkCircle /> Tugaskan ({selectedOrderIds.length}) Pesanan
                         </button>
                     )}
                     <button onClick={handleOpenAddModal} className="flex items-center gap-2 bg-brand-primary text-white font-bold py-2 px-4 rounded-lg">
@@ -863,17 +804,13 @@ export const OrderManagement: React.FC = () => {
                     <table className="min-w-full text-sm text-left text-gray-700">
                         <thead className="bg-gray-50 text-xs text-gray-700 uppercase">
                             <tr>
-                                <th scope="col" className="px-4 py-3">
-                                    <input type="checkbox" className="h-4 w-4 rounded" disabled={pendingOrders.length === 0} checked={pendingOrders.length > 0 && selectedOrderIds.length === pendingOrders.length} onChange={handleSelectAllPending} aria-label="Select all pending orders"/>
-                                </th>
                                 <th scope="col" className="px-2 py-4 w-12"></th><th scope="col" className="px-6 py-4">ID Pesanan</th><th scope="col" className="px-6 py-4">Toko</th><th scope="col" className="px-6 py-4">Tgl. Pesan</th><th scope="col" className="px-6 py-4">Tgl. Diinginkan</th><th scope="col" className="px-6 py-4 text-right">Total</th><th scope="col" className="px-6 py-4">Armada</th><th scope="col" className="px-6 py-4">Status</th><th scope="col" className="px-6 py-4 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (<tr><td colSpan={10} className="text-center p-6">Memuat pesanan...</td></tr>) : paginatedOrders.map(order => (
+                            {isLoading ? (<tr><td colSpan={9} className="text-center p-6">Memuat pesanan...</td></tr>) : paginatedOrders.map(order => (
                                 <React.Fragment key={order.id}>
                                     <tr className={`bg-white border-b hover:bg-gray-50 ${order.priority ? 'bg-yellow-50' : ''}`}>
-                                        <td className="px-4 py-3">{order.status === OrderStatus.PENDING && (<input type="checkbox" className="h-4 w-4 rounded" checked={selectedOrderIds.includes(order.id)} onChange={() => handleSelectOrder(order.id)} aria-label={`Select order ${order.id}`}/>)}</td>
                                         <td className="px-2 py-4"><button onClick={() => toggleExpand(order.id)} className="p-2 rounded-full hover:bg-gray-200" aria-label="Lihat detail"><span className={`transition-transform duration-200 inline-block ${expandedOrderIds.includes(order.id) ? 'rotate-180' : 'rotate-0'}`}><ICONS.chevronDown /></span></button></td>
                                         <td className="px-6 py-4 font-mono text-gray-500"><div className="flex items-center gap-2">{order.priority && <span className="text-yellow-500" title="Prioritas"><ICONS.star width={16} height={16} /></span>}<span>{order.id.slice(-6).toUpperCase()}</span></div></td>
                                         <td className="px-6 py-4 font-medium text-gray-900">{order.storeName}</td><td className="px-6 py-4">{formatDateDDMMYY(order.orderDate)}</td><td className="px-6 py-4">{formatDateDDMMYY(order.desiredDeliveryDate)}</td><td className="px-6 py-4 text-right font-medium">Rp {order.totalAmount.toLocaleString('id-ID')}</td><td className="px-6 py-4">{vehicles.find(v => v.id === order.assignedVehicleId)?.plateNumber || '-'}</td><td className="px-6 py-4"><EnhancedStatusBadge status={order.status} /></td>
@@ -898,7 +835,7 @@ export const OrderManagement: React.FC = () => {
                                         </td>
                                     </tr>
                                     {expandedOrderIds.includes(order.id) && (
-                                        <tr className="bg-gray-50"><td colSpan={10} className="p-0"><div className="p-4 mx-4 my-2 border bg-white rounded-lg shadow-inner"><div className="grid grid-cols-2 gap-4 mb-4 text-xs"><div className="font-semibold text-gray-500">Dipesan oleh: <p className="text-gray-800 font-normal">{order.orderedBy.name} ({order.orderedBy.role})</p></div><div className="font-semibold text-gray-500">Armada Ditugaskan: <p className="text-gray-800 font-normal">{vehicles.find(v => v.id === order.assignedVehicleId)?.plateNumber || 'Belum Ditugaskan'}</p></div></div><h4 className="font-semibold text-gray-800 mb-2 pt-2 border-t">Detail Produk Pesanan:</h4><table className="min-w-full text-xs"><thead className="bg-gray-200"><tr><th className="px-3 py-2 text-left">Produk</th><th className="px-3 py-2 text-center">Jumlah</th><th className="px-3 py-2 text-right">Harga Satuan</th><th className="px-3 py-2 text-right">Subtotal</th></tr></thead><tbody>{order.items.map(item => {const product = products.find(p => p.id === item.productId);if (!product) return <tr key={item.productId}><td colSpan={4} className="p-2 text-center text-red-500">Produk telah dihapus.</td></tr>;const price = item.specialPrice ?? item.originalPrice;const subtotal = price * item.quantity;return (<tr key={item.productId} className="border-b"><td className="px-3 py-2">{product.name}</td><td className="px-3 py-2 text-center">{item.quantity}</td><td className="px-3 py-2 text-right">Rp {price.toLocaleString('id-ID')}</td><td className="px-3 py-2 text-right font-medium">Rp {subtotal.toLocaleString('id-ID')}</td></tr>);})}</tbody></table></div></td></tr>
+                                        <tr className="bg-gray-50"><td colSpan={9} className="p-0"><div className="p-4 mx-4 my-2 border bg-white rounded-lg shadow-inner"><div className="grid grid-cols-2 gap-4 mb-4 text-xs"><div className="font-semibold text-gray-500">Dipesan oleh: <p className="text-gray-800 font-normal">{order.orderedBy.name} ({order.orderedBy.role})</p></div><div className="font-semibold text-gray-500">Armada Ditugaskan: <p className="text-gray-800 font-normal">{vehicles.find(v => v.id === order.assignedVehicleId)?.plateNumber || 'Belum Ditugaskan'}</p></div></div><h4 className="font-semibold text-gray-800 mb-2 pt-2 border-t">Detail Produk Pesanan:</h4><table className="min-w-full text-xs"><thead className="bg-gray-200"><tr><th className="px-3 py-2 text-left">Produk</th><th className="px-3 py-2 text-center">Jumlah</th><th className="px-3 py-2 text-right">Harga Satuan</th><th className="px-3 py-2 text-right">Subtotal</th></tr></thead><tbody>{order.items.map(item => {const product = products.find(p => p.id === item.productId);if (!product) return <tr key={item.productId}><td colSpan={4} className="p-2 text-center text-red-500">Produk telah dihapus.</td></tr>;const price = item.specialPrice ?? item.originalPrice;const subtotal = price * item.quantity;return (<tr key={item.productId} className="border-b"><td className="px-3 py-2">{product.name}</td><td className="px-3 py-2 text-center">{item.quantity}</td><td className="px-3 py-2 text-right">Rp {price.toLocaleString('id-ID')}</td><td className="px-3 py-2 text-right font-medium">Rp {subtotal.toLocaleString('id-ID')}</td></tr>);})}</tbody></table></div></td></tr>
                                     )}
                                 </React.Fragment>
                             ))}
@@ -919,7 +856,6 @@ export const OrderManagement: React.FC = () => {
             )}
 
             <AddEditOrderModal isOpen={isAddEditModalOpen} onClose={() => setIsAddEditModalOpen(false)} orderToEdit={orderToEdit} vehicles={vehicles} />
-            {isBatchAssignModalOpen && <BatchAssignModal isOpen={isBatchAssignModalOpen} onClose={() => setIsBatchAssignModalOpen(false)} selectedOrderIds={selectedOrderIds} vehicles={vehicles} />}
             {isCreateRouteModalOpen && <CreateRouteModal isOpen={isCreateRouteModalOpen} onClose={() => setIsCreateRouteModalOpen(false)} pendingOrders={orders.filter(o => o.status === OrderStatus.PENDING)} />}
             {isMoveOrderModalOpen && <MoveOrderModal isOpen={isMoveOrderModalOpen} onClose={() => setIsMoveOrderModalOpen(false)} order={orderToMove} />}
         </div>

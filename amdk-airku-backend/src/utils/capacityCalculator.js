@@ -24,9 +24,10 @@ const calculateOrderCapacity = (orderItems, vehicleCapacity) => {
         };
     }
 
-    // Cek apakah produk homogen (hanya 1 jenis produk)
+    // Cek apakah produk homogen
+    // Homogen jika: hanya 1 jenis produk ATAU hanya 1 item (1 toko, 1 pesanan, 1 produk)
     const uniqueProducts = new Set(orderItems.map(item => item.productId));
-    const isHomogeneous = uniqueProducts.size === 1;
+    const isHomogeneous = uniqueProducts.size === 1 || orderItems.length === 1;
 
     let totalCapacityUsed = 0;
     const capacityDetails = [];
@@ -250,8 +251,10 @@ const calculateVehicleLoad = (products, vehicleType = 'L300') => {
     const vehicleData = VEHICLE_CAPACITY_DATA[vehicleType];
     const maxCapacity = vehicleData.maxCapacityEquivalent;
     
-    // Cek apakah homogeneous (1 jenis produk)
-    const isHomogeneous = products.length === 1;
+    // Cek apakah homogeneous
+    // Homogen jika: hanya 1 jenis produk ATAU hanya 1 item total
+    const uniqueProductTypes = new Set(products.map(p => p.productType));
+    const isHomogeneous = uniqueProductTypes.size === 1 || products.length === 1;
 
     if (isHomogeneous) {
         // ATURAN 1 & 6: Hanya 1 jenis produk

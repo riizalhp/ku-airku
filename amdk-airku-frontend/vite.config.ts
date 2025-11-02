@@ -9,5 +9,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     }
+  },
+  server: {
+    host: '0.0.0.0', // Bind ke semua network interfaces
+    port: 5173,
+    strictPort: true,
   }
 })

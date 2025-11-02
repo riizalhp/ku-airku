@@ -148,6 +148,31 @@ Email: driver@pdam.com
 Password: driver123
 ```
 
+### 5. Access from Other Devices (Optional)
+
+Aplikasi dapat diakses dari perangkat lain di jaringan WiFi yang sama.
+
+**Setup Firewall (Windows - Run as Administrator):**
+
+```powershell
+.\setup-firewall.ps1
+```
+
+**Get IP Address:**
+
+```powershell
+.\get-ip.ps1
+```
+
+Akses dari perangkat lain:
+
+```
+Frontend: http://[YOUR-IP]:5173
+Backend:  http://[YOUR-IP]:3001
+```
+
+📖 **Panduan lengkap:** [NETWORK_ACCESS.md](./NETWORK_ACCESS.md)
+
 ---
 
 ## 🏗️ System Architecture

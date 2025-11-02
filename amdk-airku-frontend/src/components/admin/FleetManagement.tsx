@@ -251,23 +251,51 @@ export const FleetManagement: React.FC = () => {
             // Add return distance to depot
             totalDistance += getDistance(lastLocation, depotLocation);
 
-            // Calculate capacity usage
+            // Calculate capacity usage dengan logika homogen/heterogen
             let totalCapacityUsed = 0;
+            const allProductsInRoute: string[] = [];
+            
+            // Collect all products from all stops in this route
+            route.stops.forEach(stop => {
+                const order = orders.find(o => o.id === stop.orderId);
+                if (order && order.items) {
+                    order.items.forEach(item => {
+                        allProductsInRoute.push(item.productId);
+                    });
+                }
+            });
+
+            // Determine if route is homogeneous
+            const uniqueProductIds = new Set(allProductsInRoute);
+            const isHomogeneous = uniqueProductIds.size === 1 || allProductsInRoute.length === 1;
+            
+            console.log(`Route ${route.id} (${route.region}):`, {
+                totalItems: allProductsInRoute.length,
+                uniqueProducts: uniqueProductIds.size,
+                isHomogeneous: isHomogeneous
+            });
+
+            // Calculate capacity with correct logic
             route.stops.forEach(stop => {
                 const order = orders.find(o => o.id === stop.orderId);
                 if (order && order.items) {
                     order.items.forEach(item => {
                         const product = products.find(p => p.id === item.productId);
                         if (product) {
-                            // Use capacityConversionHeterogeneous for calculation
-                            const conversionRate = product.capacityConversionHeterogeneous || 1.0;
+                            // PERBAIKAN: Gunakan logika homogen/heterogen
+                            const conversionRate = isHomogeneous 
+                                ? (product.capacityUnit || 1.0)  // Homogen: gunakan capacityUnit
+                                : (product.capacityConversionHeterogeneous || 1.0); // Heterogen: gunakan conversion
+                            
                             totalCapacityUsed += item.quantity * conversionRate;
+                            
+                            console.log(`  - ${product.name}: ${item.quantity} × ${conversionRate} = ${item.quantity * conversionRate}`);
                         }
                     });
                 }
             });
 
-            console.log(`Route ${route.id}: capacity used = ${totalCapacityUsed}`);
+            console.log(`  Total capacity: ${totalCapacityUsed} (${isHomogeneous ? 'HOMOGEN' : 'HETEROGEN'})`);
 
             return {
                 ...route,
@@ -348,12 +376,27 @@ export const FleetManagement: React.FC = () => {
                                         </p>
                                     </div>
 
-                                    {/* Capacity Usage */}
+                                    {/* Total Load Display - For Both Assigned and Unassigned */}
+                                    <div className={`p-3 rounded-lg ${isAssigned ? 'bg-green-50' : 'bg-purple-50'}`}>
+                                        <p className="text-sm font-semibold text-gray-700 mb-1">
+                                            <ICONS.product className="inline mr-1" width={16} height={16} />
+                                            Total Muatan:
+                                        </p>
+                                        <p className="text-lg font-bold text-brand-dark">
+                                            {route.capacityUsed || 0} unit
+                                        </p>
+                                        {!isAssigned && (
+                                            <p className="text-xs text-gray-600 mt-1">
+                                                (Unit equivalen - sudah disesuaikan dengan jenis muatan)
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Capacity Usage - Only for Assigned Routes with Vehicle */}
                                     {isAssigned && vehicle && (
-                                        <div className="bg-green-50 p-3 rounded-lg">
-                                            <p className="text-sm font-semibold text-gray-700 mb-1">
-                                                <ICONS.product className="inline mr-1" width={16} height={16} />
-                                                Kapasitas Muatan:
+                                        <div className="bg-green-50 p-3 rounded-lg border-t-2 border-green-200">
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">
+                                                Kapasitas Armada {vehicle.plateNumber}:
                                             </p>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex-1 bg-gray-200 rounded-full h-2.5">
@@ -436,23 +479,71 @@ export const FleetManagement: React.FC = () => {
                                     {/* Expanded Details */}
                                     {isExpanded && (
                                         <div className="border-t pt-3 mt-3">
-                                            <h4 className="font-semibold text-gray-800 mb-2">Daftar Pemberhentian:</h4>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                                {route.stops.map((stop, index) => (
-                                                    <div key={stop.id} className="bg-gray-50 p-2 rounded text-sm">
-                                                        <p className="font-semibold text-gray-700">
-                                                            {index + 1}. {stop.storeName}
-                                                        </p>
-                                                        <p className="text-gray-600 text-xs">
-                                                            Pesanan: {stop.orderId.slice(-6).toUpperCase()}
-                                                        </p>
-                                                        <p className="text-gray-600 text-xs">
-                                                            Status: <span className={`font-semibold ${stop.status === 'Completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                                                {stop.status === 'Completed' ? 'Selesai' : 'Pending'}
-                                                            </span>
-                                                        </p>
-                                                    </div>
-                                                ))}
+                                            <h4 className="font-semibold text-gray-800 mb-3">Daftar Pemberhentian:</h4>
+                                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                                {route.stops.map((stop, index) => {
+                                                    const order = orders.find(o => o.id === stop.orderId);
+                                                    
+                                                    return (
+                                                        <div key={stop.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                            {/* Stop Header */}
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <div className="flex-1">
+                                                                    <p className="font-bold text-gray-800 text-sm">
+                                                                        {index + 1}. {stop.storeName}
+                                                                    </p>
+                                                                    <p className="text-gray-600 text-xs mt-0.5">
+                                                                        ID Pesanan: {stop.orderId.slice(-6).toUpperCase()}
+                                                                    </p>
+                                                                </div>
+                                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                                                    stop.status === 'Completed' 
+                                                                        ? 'bg-green-100 text-green-700' 
+                                                                        : 'bg-yellow-100 text-yellow-700'
+                                                                }`}>
+                                                                    {stop.status === 'Completed' ? 'Selesai' : 'Pending'}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            {/* Order Details */}
+                                                            {order && order.items && order.items.length > 0 && (
+                                                                <div className="mt-2 pt-2 border-t border-gray-300">
+                                                                    <p className="text-xs font-semibold text-gray-700 mb-2">Detail Pesanan:</p>
+                                                                    <div className="space-y-1.5">
+                                                                        {order.items.map((item) => {
+                                                                            const product = products.find(p => p.id === item.productId);
+                                                                            if (!product) return null;
+                                                                            
+                                                                            return (
+                                                                                <div key={item.productId} className="bg-white p-2 rounded text-xs">
+                                                                                    <div className="flex justify-between items-start">
+                                                                                        <span className="font-medium text-gray-800 flex-1">
+                                                                                            {product.name}
+                                                                                        </span>
+                                                                                        <span className="text-gray-600 ml-2">
+                                                                                            {item.quantity} pcs
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-gray-500 mt-0.5">
+                                                                                        Rp {(item.specialPrice || item.originalPrice).toLocaleString('id-ID')} / pcs
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    
+                                                                    {/* Order Total */}
+                                                                    <div className="mt-2 pt-2 border-t border-gray-300 flex justify-between items-center">
+                                                                        <span className="text-xs font-semibold text-gray-700">Total Pesanan:</span>
+                                                                        <span className="text-xs font-bold text-brand-primary">
+                                                                            Rp {order.totalAmount.toLocaleString('id-ID')}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}

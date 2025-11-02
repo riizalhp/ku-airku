@@ -23,7 +23,7 @@ const app = express();
 
 // Middleware
 app.use(cors({ 
-  origin: 'http://localhost:5173',
+  origin: '*', // Izinkan semua origin, atau bisa spesifik ke IP local network
   credentials: true
 }));
 // Tingkatkan batas ukuran payload menjadi 5MB untuk unggahan gambar
@@ -109,6 +109,7 @@ process.on('uncaughtException', (error) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Server dapat diakses dari jaringan lokal di: http://<IP-ADDRESS>:${PORT}`);
 });
