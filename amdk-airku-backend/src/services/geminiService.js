@@ -58,10 +58,11 @@ function fallbackClassifyStoreRegion(storeLocation) {
   }
   
   // 4. KULON PROGO - Bagian BARAT DIY (sekitar 586.27 km²)
-  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561), Sentolo (-7.82, 110.21)
+  // Koordinat referensi: Wates (-7.8564, 110.1599), Bandara YIA (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04)
   // PENTING: Kulon Progo mencakup area longitude 110.00 - 110.30
+  // Batas utara diperluas ke -7.60 untuk mencakup seluruh area Kulon Progo termasuk kecamatan di perbatasan dengan Sleman
   // Sub-klasifikasi: Timur dan Barat berdasarkan PDAM Tirta Binangun (110.1486773)
-  if (lat >= -8.00 && lat <= -7.67 && lng >= 110.00 && lng <= 110.30) {
+  if (lat >= -8.10 && lat <= -7.60 && lng >= 110.00 && lng <= 110.30) {
     const pdamKulonProgoLongitude = 110.1486773;
     if (lng > pdamKulonProgoLongitude) {
       return { region: "Kulon Progo - Timur" };
@@ -113,10 +114,11 @@ async function classifyStoreRegion(storeLocation) {
        - IMPORTANT: Bantul does NOT include areas with lng < 110.30 (those are Kulon Progo)
     
     4. **Kabupaten Kulon Progo** (Western DIY - ~586.27 km²)
-       - Western part of DIY, includes new YIA airport and Sentolo area
-       - Bounding box: lat -8.00 to -7.67, lng 110.00 to 110.30
-       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561), Sentolo (-7.82, 110.21)
+       - Western part of DIY, includes new YIA airport, Sentolo, Temon, and Wates areas
+       - Bounding box: lat -8.10 to -7.60, lng 110.00 to 110.30
+       - Key landmarks: Wates (-7.8564, 110.1599), YIA Airport (-7.9000, 110.0561), Sentolo (-7.82, 110.21), Temon (-7.90, 110.04)
        - IMPORTANT: Kulon Progo covers longitude 110.00 - 110.30 (western part of DIY)
+       - Latitude range extended to -7.60 to cover all northern districts bordering Sleman
        - Sub-classification: 'Kulon Progo - Timur' if lng > ${pdamKulonProgoLongitude}, else 'Kulon Progo - Barat'
     
     5. **Kabupaten Gunung Kidul** (Eastern DIY - LARGEST, ~1,485.36 km²)
