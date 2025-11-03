@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tantml:query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { getVehicles } from '../../services/vehicleApiService';
 import { getUsers } from '../../services/userApiService';
@@ -9,7 +9,7 @@ import { Modal } from '../ui/Modal';
 import { ICONS } from '../../constants';
 import { getDistance } from '../../utils/geolocation';
 
-const RouteStatusBadge: React.FC<{ driverId?: string; vehicleId?: string }> = ({ driverId, vehicleId }) => {
+const RouteStatusBadge: React.FC<{ driverId?: string | null; vehicleId?: string | null }> = ({ driverId, vehicleId }) => {
     if (driverId && vehicleId) {
         return <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">Sudah Ditugaskan</span>;
     }
@@ -24,7 +24,6 @@ interface AssignModalProps {
 }
 
 const AssignModal: React.FC<AssignModalProps> = ({ route, onClose, vehicles, users }) => {
-    const queryClient = useQueryClient();
     const [vehicleId, setVehicleId] = useState('');
     const [driverId, setDriverId] = useState('');
     const [error, setError] = useState('');
@@ -37,9 +36,11 @@ const AssignModal: React.FC<AssignModalProps> = ({ route, onClose, vehicles, use
         return users.filter(u => u.role === Role.DRIVER);
     }, [users]);
 
+    const queryClient = useQueryClient();
+    
     const assignMutation = useMutation({
-        mutationFn: ({ routeId, vehicleId, driverId }: { routeId: string; vehicleId: string; driverId: string }) => 
-            assignDriverVehicle(routeId, vehicleId, driverId),
+        mutationFn: (payload: { routeId: string; vehicleId: string; driverId: string }) => 
+            assignDriverVehicle(payload),
         onSuccess: () => {
             alert('Rute berhasil ditugaskan!');
             queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] });
@@ -149,7 +150,6 @@ const AssignModal: React.FC<AssignModalProps> = ({ route, onClose, vehicles, use
 
 export const FleetManagement: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
-    const queryClient = useQueryClient();
     const [selectedDate, setSelectedDate] = useState(today);
     const [selectedRoute, setSelectedRoute] = useState<RoutePlan | null>(null);
     const [expandedRouteIds, setExpandedRouteIds] = useState<string[]>([]);
@@ -175,11 +175,11 @@ export const FleetManagement: React.FC = () => {
     const routesWithDistance = useMemo(() => {
         const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
         
-        return routes.map(route => {
+        return routes.map((route: RoutePlan) => {
             let totalDistance = 0;
             let lastLocation = depotLocation;
 
-            route.stops.forEach(stop => {
+            route.stops.forEach((stop: { location: { lat: number; lng: number } }) => {
                 const distance = getDistance(lastLocation, stop.location);
                 totalDistance += distance;
                 lastLocation = stop.location;
@@ -238,9 +238,9 @@ export const FleetManagement: React.FC = () => {
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {routesWithDistance.map((route) => {
-                        const driver = users.find(u => u.id === route.driverId);
-                        const vehicle = vehicles.find(v => v.id === route.vehicleId);
+                    {routesWithDistance.map((route: RoutePlan & { totalDistance: number }) => {
+                        const driver = users.find((u: User) => u.id === route.driverId);
+                        const vehicle = vehicles.find((v: Vehicle) => v.id === route.vehicleId);
                         const isExpanded = expandedRouteIds.includes(route.id);
                         const isAssigned = !!route.driverId && !!route.vehicleId;
 
@@ -299,7 +299,7 @@ export const FleetManagement: React.FC = () => {
                                         <div className="border-t pt-3 mt-3">
                                             <h4 className="font-semibold text-gray-800 mb-2">Daftar Pemberhentian:</h4>
                                             <div className="space-y-2 max-h-60 overflow-y-auto">
-                                                {route.stops.map((stop, index) => (
+                                                {route.stops.map((stop: any, index: number) => (
                                                     <div key={stop.id} className="bg-gray-50 p-2 rounded text-sm">
                                                         <p className="font-semibold text-gray-700">
                                                             {index + 1}. {stop.storeName}
@@ -308,8 +308,8 @@ export const FleetManagement: React.FC = () => {
                                                             Pesanan: {stop.orderId.slice(-6).toUpperCase()}
                                                         </p>
                                                         <p className="text-gray-600 text-xs">
-                                                            Status: <span className={`font-semibold ${stop.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                                                {stop.status === 'completed' ? 'Selesai' : 'Pending'}
+                                                            Status: <span className={`font-semibold ${stop.status === 'Completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                                {stop.status === 'Completed' ? 'Selesai' : 'Pending'}
                                                             </span>
                                                         </p>
                                                     </div>

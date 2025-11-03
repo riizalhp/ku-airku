@@ -1,5 +1,4 @@
 import React from 'react';
-import { ICONS } from '../../constants';
 
 interface PaginationProps {
     currentPage: number;
