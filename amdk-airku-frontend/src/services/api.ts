@@ -1,24 +1,26 @@
 import axios from 'axios';
 
-// Deteksi API URL berdasarkan environment atau gunakan IP local
-// Untuk development, bisa gunakan VITE_API_URL dari .env
-// Atau otomatis gunakan host yang sama dengan frontend
+// Fungsi untuk menentukan base URL API
 const getApiBaseUrl = () => {
-  // Cek environment variable dulu
+  // 1️⃣ Cek dari environment variable (.env)
   const envApiUrl = (import.meta as any).env?.VITE_API_URL;
   if (envApiUrl) {
     return envApiUrl;
   }
-  
-  // Jika diakses dari network (bukan localhost), gunakan host yang sama
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return `http://${window.location.hostname}:3001/api`;
+
+  // 2️⃣ Kalau sedang di localhost (dev), pakai local backend
+  if (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  ) {
+    return 'http://localhost:3001/api';
   }
-  
-  // Default ke localhost
-  return 'http://localhost:3001/api';
+
+  // 3️⃣ Default (production di Vercel / hosting lain)
+  return 'https://ku-airku-production-b800.up.railway.app/api';
 };
 
+// Buat instance axios
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   headers: {
@@ -26,31 +28,24 @@ const api = axios.create({
   },
 });
 
-// Response interceptor untuk menangani error token expired
+// Interceptor untuk handle token expired
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
-      
-      // Jika token expired atau invalid, hapus token dan redirect ke login
-      if (status === 401 && (data.error === 'TOKEN_EXPIRED' || data.error === 'INVALID_TOKEN' || data.error === 'NO_TOKEN')) {
-        // Hapus token dari localStorage
+      if (
+        status === 401 &&
+        ['TOKEN_EXPIRED', 'INVALID_TOKEN', 'NO_TOKEN'].includes(data.error)
+      ) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        
-        // Hapus token dari axios headers
         delete api.defaults.headers.common['Authorization'];
-        
-        // Redirect ke halaman login
         if (window.location.pathname !== '/') {
           window.location.href = '/';
         }
       }
     }
-    
     return Promise.reject(error);
   }
 );
