@@ -3,7 +3,7 @@ const Vehicle = require('../models/vehicleModel');
 const User = require('../models/userModel');
 const Order = require('../models/orderModel');
 const Route = require('../models/routeModel');
-const { calculateSavingsMatrixRoutes, clusterOrdersByRegion } = require('../services/routingService');
+const { calculateSavingsMatrixRoutes } = require('../services/routingService');
 const { getDistance } = require('../utils/geolocation');
 
 const createPlan = async (req, res) => {
@@ -75,12 +75,9 @@ const createPlan = async (req, res) => {
 // Helper function: Create unassigned routes (no driver/vehicle)
 async function createUnassignedRoutes(orders, deliveryDate, res) {
     console.log('[Route Planning] Creating unassigned routes...');
+    console.log('[Route Planning] Using PURE CLARKE-WRIGHT algorithm (NO regional clustering)');
     
     const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
-    
-    // ===== STEP 1: CLUSTER ORDERS BY REGION =====
-    const regionClusters = clusterOrdersByRegion(orders);
-    console.log('[Route Planning] Region clusters:', Object.keys(regionClusters));
     
     const allCreatedRoutes = [];
     // Use L300 capacity as default (200 equivalent units)
@@ -88,84 +85,98 @@ async function createUnassignedRoutes(orders, deliveryDate, res) {
     const DEFAULT_CAPACITY = 200; 
     
     console.log('[Route Planning] Using default capacity:', DEFAULT_CAPACITY);
+    console.log('[Route Planning] Total orders to route:', orders.length);
     
-    // ===== STEP 2: PROCESS EACH REGION SEPARATELY =====
-    for (const [region, regionOrders] of Object.entries(regionClusters)) {
-        console.log(`[Route Planning] Processing region: ${region} with ${regionOrders.length} orders`);
+    // ===== STEP 1: GROUP ALL ORDERS BY STORE (NO REGIONAL CLUSTERING) =====
+    const storeStops = orders.reduce((acc, order) => {
+        if (!acc[order.storeId]) {
+            acc[order.storeId] = {
+                storeId: order.storeId, 
+                storeName: order.storeName, 
+                address: order.address,
+                location: order.location, 
+                totalDemand: 0, 
+                orderIds: [], 
+                priority: false,
+                region: order.region || 'Unknown'
+            };
+        }
+        acc[order.storeId].totalDemand += order.demand;
+        acc[order.storeId].orderIds.push(order.id);
+        if (order.priority) acc[order.storeId].priority = true;
+        return acc;
+    }, {});
+
+    const nodes = Object.values(storeStops).map(store => ({
+        id: store.storeId,
+        location: store.location, 
+        demand: store.totalDemand, 
+        priority: store.priority,
+        region: store.region
+    }));
+
+    console.log(`[Route Planning] Total stores (nodes): ${nodes.length}`);
+    console.log('[Route Planning] Store demands:', nodes.map(n => ({ id: n.id, demand: n.demand, region: n.region })));
+    console.log('[Route Planning] Total demand:', nodes.reduce((sum, n) => sum + n.demand, 0));
+
+    // ===== STEP 2: RUN CLARKE-WRIGHT FOR ALL ORDERS AT ONCE =====
+    console.log('[Route Planning] Running Clarke-Wright Savings Matrix algorithm...');
+    const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, DEFAULT_CAPACITY);
+    
+    console.log(`[Route Planning] Clarke-Wright generated ${calculatedTrips.length} optimal routes`);
+
+    // ===== STEP 3: CREATE ROUTES FROM CLARKE-WRIGHT RESULTS =====
+    for (let tripIndex = 0; tripIndex < calculatedTrips.length; tripIndex++) {
+        const tripStoreIds = calculatedTrips[tripIndex];
+        const stopsForThisTrip = [];
         
-        // Group orders by store within this region
-        const storeStops = regionOrders.reduce((acc, order) => {
-            if (!acc[order.storeId]) {
-                acc[order.storeId] = {
-                    storeId: order.storeId, 
-                    storeName: order.storeName, 
-                    address: order.address,
-                    location: order.location, 
-                    totalDemand: 0, 
-                    orderIds: [], 
-                    priority: false,
-                };
+        // Determine route region based on most common region in the trip
+        const regionsInTrip = [];
+        
+        for (const storeId of tripStoreIds) {
+            const storeData = storeStops[storeId];
+            if (storeData) {
+                regionsInTrip.push(storeData.region);
+                
+                storeData.orderIds.forEach(orderId => {
+                    const orderData = orders.find(o => o.id === orderId);
+                    if (orderData) {
+                        stopsForThisTrip.push({
+                            orderId: orderData.id,
+                            storeId: orderData.storeId,
+                            storeName: orderData.storeName,
+                            address: orderData.address,
+                            location: orderData.location
+                        });
+                    }
+                });
             }
-            acc[order.storeId].totalDemand += order.demand;
-            acc[order.storeId].orderIds.push(order.id);
-            if (order.priority) acc[order.storeId].priority = true;
+        }
+        
+        // Get most common region for this route
+        const regionCounts = regionsInTrip.reduce((acc, r) => {
+            acc[r] = (acc[r] || 0) + 1;
             return acc;
         }, {});
-
-        const nodes = Object.values(storeStops).map(store => ({
-            id: store.storeId,
-            location: store.location, 
-            demand: store.totalDemand, 
-            priority: store.priority,
-        }));
-
-        console.log(`[Route Planning] Creating routes for ${nodes.length} stores in region ${region}`);
-        console.log('[Route Planning] Store demands:', nodes.map(n => ({ id: n.id, demand: n.demand })));
-        console.log('[Route Planning] Total demand for region:', nodes.reduce((sum, n) => sum + n.demand, 0));
-
-        // ===== STEP 3: RUN CLARKE-WRIGHT FOR THIS REGION =====
-        const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, DEFAULT_CAPACITY);
+        const routeRegion = Object.keys(regionCounts).reduce((a, b) => 
+            regionCounts[a] > regionCounts[b] ? a : b
+        );
         
-        console.log(`[Route Planning] Generated ${calculatedTrips.length} trips for region ${region}`);
-
-        // ===== STEP 4: CREATE ROUTES FOR THIS REGION =====
-        for (const tripStoreIds of calculatedTrips) {
-            const stopsForThisTrip = [];
-            
-            for (const storeId of tripStoreIds) {
-                const storeData = storeStops[storeId];
-                if (storeData) {
-                    storeData.orderIds.forEach(orderId => {
-                        const orderData = regionOrders.find(o => o.id === orderId);
-                        if (orderData) {
-                            stopsForThisTrip.push({
-                                orderId: orderData.id,
-                                storeId: orderData.storeId,
-                                storeName: orderData.storeName,
-                                address: orderData.address,
-                                location: orderData.location
-                            });
-                        }
-                    });
-                }
-            }
-            
-            if (stopsForThisTrip.length > 0) {
-                console.log(`[Route Planning] Creating unassigned route for region ${region} with ${stopsForThisTrip.length} stops`);
-                const newRoutePlan = { 
-                    driverId: null, 
-                    vehicleId: null, 
-                    date: deliveryDate, 
-                    stops: stopsForThisTrip,
-                    assignmentStatus: 'unassigned'
-                };
-                const createdRoute = await Route.createPlan(newRoutePlan);
-                allCreatedRoutes.push(createdRoute);
-            }
+        if (stopsForThisTrip.length > 0) {
+            console.log(`[Route Planning] Creating route ${tripIndex + 1} with ${stopsForThisTrip.length} stops (Region: ${routeRegion})`);
+            const newRoutePlan = { 
+                driverId: null, 
+                vehicleId: null, 
+                date: deliveryDate, 
+                stops: stopsForThisTrip,
+                assignmentStatus: 'unassigned'
+            };
+            const createdRoute = await Route.createPlan(newRoutePlan);
+            allCreatedRoutes.push(createdRoute);
         }
     }
 
-    const message = `Berhasil membuat ${allCreatedRoutes.length} rute tanpa assignment (dikelompokkan per wilayah). Silakan assign driver dan armada sebelum berangkat.`;
+    const message = `Berhasil membuat ${allCreatedRoutes.length} rute optimal menggunakan Clarke-Wright Savings Matrix. Silakan assign driver dan armada sebelum berangkat.`;
     res.status(201).json({ success: true, message, routes: allCreatedRoutes });
 }
 
@@ -215,11 +226,9 @@ async function createAssignedRoutes(remainingOrders, deliveryDate, assignments, 
         let totalRoutedOrders = 0;
         const depotLocation = { lat: -7.8664161, lng: 110.1486773 }; // PDAM Tirta Binangun
 
-        // ===== STEP 1: CLUSTER ALL REMAINING ORDERS BY REGION =====
-        console.log('[Route Planning] Clustering orders by region before vehicle assignment...');
-        const regionClusters = clusterOrdersByRegion(remainingOrders);
+        console.log('[Route Planning] Using PURE CLARKE-WRIGHT algorithm (NO regional clustering)');
         
-        // --- 2. Iterative Route Generation for Each Vehicle ---
+        // --- Iterative Route Generation for Each Vehicle ---
         for (const assignment of assignments) {
             const { vehicleId, driverId } = assignment;
             const vehicle = assignedVehicles.find(v => v.id === vehicleId);
@@ -229,108 +238,99 @@ async function createAssignedRoutes(remainingOrders, deliveryDate, assignments, 
             console.log(`[Route Planning] Processing vehicle: ${vehicle.plateNumber} (capacity: ${vehicle.capacity})`);
             console.log(`[Route Planning] Remaining orders for this vehicle: ${remainingOrders.length}`);
             
-            // ===== STEP 2: PROCESS EACH REGION SEPARATELY FOR THIS VEHICLE =====
             const routedOrderIdsThisVehicle = new Set();
             
-            for (const [region, regionOrders] of Object.entries(regionClusters)) {
-                // Filter to only remaining orders in this region
-                const remainingRegionOrders = regionOrders.filter(o => 
-                    remainingOrders.some(ro => ro.id === o.id)
-                );
-                
-                if (remainingRegionOrders.length === 0) continue;
-                
-                console.log(`[Route Planning] Processing region: ${region} with ${remainingRegionOrders.length} remaining orders`);
-                
-                // Group remaining orders by store to create nodes for VRP
-                const storeStops = remainingRegionOrders.reduce((acc, order) => {
-                    if (!acc[order.storeId]) {
-                        acc[order.storeId] = {
-                            storeId: order.storeId, storeName: order.storeName, address: order.address,
-                            location: order.location, totalDemand: 0, orderIds: [], priority: false,
-                        };
-                    }
-                    acc[order.storeId].totalDemand += order.demand;
-                    acc[order.storeId].orderIds.push(order.id);
-                    if (order.priority) acc[order.storeId].priority = true;
-                    return acc;
-                }, {});
+            // ===== GROUP ALL REMAINING ORDERS BY STORE (NO REGIONAL CLUSTERING) =====
+            const storeStops = remainingOrders.reduce((acc, order) => {
+                if (!acc[order.storeId]) {
+                    acc[order.storeId] = {
+                        storeId: order.storeId, 
+                        storeName: order.storeName, 
+                        address: order.address,
+                        location: order.location, 
+                        totalDemand: 0, 
+                        orderIds: [], 
+                        priority: false,
+                        region: order.region || 'Unknown'
+                    };
+                }
+                acc[order.storeId].totalDemand += order.demand;
+                acc[order.storeId].orderIds.push(order.id);
+                if (order.priority) acc[order.storeId].priority = true;
+                return acc;
+            }, {});
 
-                console.log(`[Route Planning] Region ${region} - Unique stores: ${Object.keys(storeStops).length}`);
-                
-                const nodes = Object.values(storeStops).map(store => ({
-                    id: store.storeId, // VRP works with store IDs
-                    location: store.location, demand: store.totalDemand, priority: store.priority,
-                }));
+            console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} - Total stores: ${Object.keys(storeStops).length}`);
+            
+            const nodes = Object.values(storeStops).map(store => ({
+                id: store.storeId,
+                location: store.location, 
+                demand: store.totalDemand, 
+                priority: store.priority,
+            }));
 
-                console.log(`[Route Planning] Region ${region} - Nodes for VRP: ${nodes.length}`);
+            console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} - Nodes for Clarke-Wright: ${nodes.length}`);
+            console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} - Total demand: ${nodes.reduce((sum, n) => sum + n.demand, 0)}`);
+            
+            // ===== RUN CLARKE-WRIGHT FOR ALL REMAINING ORDERS =====
+            console.log(`[Route Planning] Running Clarke-Wright for vehicle ${vehicle.plateNumber}...`);
+            const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, vehicle.capacity);
+            
+            console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} - Clarke-Wright generated ${calculatedTrips.length} trips`);
+            
+            // Create route plans for each trip
+            for (let tripIndex = 0; tripIndex < calculatedTrips.length; tripIndex++) {
+                const tripStoreIds = calculatedTrips[tripIndex];
+                const stopsForThisTrip = [];
+                const processedOrderIds = new Set();
                 
-                // ===== STEP 3: RUN CLARKE-WRIGHT FOR THIS REGION =====
-                const calculatedTrips = calculateSavingsMatrixRoutes(nodes, depotLocation, vehicle.capacity);
-                
-                console.log(`[Route Planning] Region ${region} - Calculated trips: ${calculatedTrips.length}`);
-                
-                // For each trip, create a full RoutePlan with all associated orders
-                for (const tripStoreIds of calculatedTrips) {
-                    const stopsForThisTrip = [];
-                    const processedOrderIds = new Set(); // Track processed orders to avoid duplicates
-                    
-                    for (const storeId of tripStoreIds) {
-                        const storeData = storeStops[storeId];
-                        if (storeData) {
-                            console.log(`[Route Planning] Region ${region} - Processing store ${storeData.storeName} with ${storeData.orderIds.length} orders`);
+                for (const storeId of tripStoreIds) {
+                    const storeData = storeStops[storeId];
+                    if (storeData) {
+                        console.log(`[Route Planning] Processing store ${storeData.storeName} with ${storeData.orderIds.length} orders`);
+                        
+                        storeData.orderIds.forEach(orderId => {
+                            if (processedOrderIds.has(orderId)) {
+                                console.warn(`[Route Planning] WARNING: Order ${orderId} already processed, skipping duplicate`);
+                                return;
+                            }
                             
-                            storeData.orderIds.forEach(orderId => {
-                                // Skip if already processed (shouldn't happen, but defensive)
-                                if (processedOrderIds.has(orderId)) {
-                                    console.warn(`[Route Planning] WARNING: Order ${orderId} already processed, skipping duplicate`);
-                                    return;
-                                }
-                                
-                                const orderData = remainingRegionOrders.find(o => o.id === orderId);
-                                if (orderData) {
-                                    stopsForThisTrip.push({
-                                        orderId: orderData.id,
-                                        storeId: orderData.storeId,
-                                        storeName: orderData.storeName,
-                                        address: orderData.address,
-                                        location: orderData.location
-                                    });
-                                    routedOrderIdsThisVehicle.add(orderId);
-                                    processedOrderIds.add(orderId);
-                                }
-                            });
-                        }
+                            const orderData = remainingOrders.find(o => o.id === orderId);
+                            if (orderData) {
+                                stopsForThisTrip.push({
+                                    orderId: orderData.id,
+                                    storeId: orderData.storeId,
+                                    storeName: orderData.storeName,
+                                    address: orderData.address,
+                                    location: orderData.location
+                                });
+                                routedOrderIdsThisVehicle.add(orderId);
+                                processedOrderIds.add(orderId);
+                            }
+                        });
                     }
-                    
-                    if (stopsForThisTrip.length > 0) {
-                        console.log(`[Route Planning] Creating route plan for region ${region} with ${stopsForThisTrip.length} stops`);
-                        console.log(`[Route Planning] Stop order IDs:`, stopsForThisTrip.map(s => s.orderId.slice(-8)));
-                        const newRoutePlan = { driverId, vehicleId, date: deliveryDate, stops: stopsForThisTrip };
-                        const createdRoute = await Route.createPlan(newRoutePlan);
-                        console.log(`[Route Planning] Route plan created: ${createdRoute.id} for region ${region}`);
-                        allCreatedRoutes.push(createdRoute);
-                    }
+                }
+                
+                if (stopsForThisTrip.length > 0) {
+                    console.log(`[Route Planning] Creating route ${tripIndex + 1} for vehicle ${vehicle.plateNumber} with ${stopsForThisTrip.length} stops`);
+                    console.log(`[Route Planning] Stop order IDs:`, stopsForThisTrip.map(s => s.orderId.slice(-8)));
+                    const newRoutePlan = { driverId, vehicleId, date: deliveryDate, stops: stopsForThisTrip };
+                    const createdRoute = await Route.createPlan(newRoutePlan);
+                    console.log(`[Route Planning] Route plan created: ${createdRoute.id}`);
+                    allCreatedRoutes.push(createdRoute);
                 }
             }
             
             console.log(`[Route Planning] Vehicle ${vehicle.plateNumber} routed ${routedOrderIdsThisVehicle.size} orders`);
 
-            // Update remaining orders for the next vehicle in the loop
+            // Update remaining orders for the next vehicle
             if (routedOrderIdsThisVehicle.size > 0) {
                 totalRoutedOrders += routedOrderIdsThisVehicle.size;
                 remainingOrders = remainingOrders.filter(o => !routedOrderIdsThisVehicle.has(o.id));
-                
-                // Update region clusters to remove routed orders
-                for (const region of Object.keys(regionClusters)) {
-                    regionClusters[region] = regionClusters[region].filter(o => 
-                        !routedOrderIdsThisVehicle.has(o.id)
-                    );
-                }
             }
         }
         
-        const message = `Berhasil membuat ${allCreatedRoutes.length} perjalanan untuk ${assignments.length} armada, menjadwalkan ${totalRoutedOrders} pesanan (dikelompokkan per wilayah).`;
+        const message = `Berhasil membuat ${allCreatedRoutes.length} rute optimal untuk ${assignments.length} armada menggunakan Clarke-Wright Savings Matrix, menjadwalkan ${totalRoutedOrders} pesanan.`;
         res.status(201).json({ success: true, message, routes: allCreatedRoutes });
 }
 
