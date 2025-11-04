@@ -3,61 +3,71 @@ const pool = require('../config/db');
 const { randomUUID } = require('crypto');
 
 const createPlan = async (plan) => {
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
 
-    try {
-      const { driverId, vehicleId, date, stops, assignmentStatus = 'assigned' } = plan;
-      const planId = randomUUID();
+  try {
+    // Ambil region juga dari plan (kalau tidak ada, isi 'unknown')
+    const { driverId, vehicleId, date, stops, region, assignmentStatus = 'assigned' } = plan;
+    const planId = randomUUID();
+    const regionValue = region || 'unknown';
 
-      // Insert into route_plans table (driverId and vehicleId can be NULL)
-      const routePlanQuery = `
-        INSERT INTO route_plans (id, driverId, vehicleId, date, assignmentStatus) 
-        VALUES (?, ?, ?, ?, ?)`;
-      await connection.query(routePlanQuery, [planId, driverId, vehicleId, date, assignmentStatus]);
-      
-      if (stops && stops.length > 0) {
-        // Prepare bulk insert for route_stops table, now including lat/lng
-        const routeStopsQuery = `
-          INSERT INTO route_stops (id, routePlanId, orderId, storeId, storeName, address, lat, lng, status, sequence)
-          VALUES ?`;
-        const routeStopsData = stops.map((stop, index) => [
-          randomUUID(),
-          planId,
-          stop.orderId,
-          stop.storeId,
-          stop.storeName,
-          stop.address,
-          stop.location.lat,
-          stop.location.lng,
-          'Pending', // Default status for a new stop
-          index + 1  // Sequence number
-        ]);
-        await connection.query(routeStopsQuery, [routeStopsData]);
+    // Insert ke route_plans, sekarang sudah include kolom region
+    const routePlanQuery = `
+      INSERT INTO route_plans (id, driverId, vehicleId, date, region, assignmentStatus)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    await connection.query(routePlanQuery, [
+      planId,
+      driverId,
+      vehicleId,
+      date,
+      regionValue,
+      assignmentStatus
+    ]);
 
-        // Update the status of the orders included in this new route
-        const orderIds = stops.map(stop => stop.orderId);
-        const placeholders = orderIds.map(() => '?').join(',');
-        // If vehicleId is NULL (unassigned route), don't set assignedVehicleId yet
-        const updateOrdersQuery = vehicleId 
-          ? `UPDATE orders SET status = 'Routed', assignedVehicleId = ? WHERE id IN (${placeholders})`
-          : `UPDATE orders SET status = 'Routed' WHERE id IN (${placeholders})`;
-        const updateParams = vehicleId ? [vehicleId, ...orderIds] : orderIds;
-        await connection.query(updateOrdersQuery, updateParams);
-      }
+    // Kalau ada stops, lakukan insert ke route_stops
+    if (stops && stops.length > 0) {
+      const routeStopsQuery = `
+        INSERT INTO route_stops (id, routePlanId, orderId, storeId, storeName, address, lat, lng, status, sequence)
+        VALUES ?
+      `;
+      const routeStopsData = stops.map((stop, index) => [
+        randomUUID(),
+        planId,
+        stop.orderId,
+        stop.storeId,
+        stop.storeName,
+        stop.address,
+        stop.location.lat,
+        stop.location.lng,
+        'Pending', // Default status untuk stop baru
+        index + 1  // Urutan stop
+      ]);
+      await connection.query(routeStopsQuery, [routeStopsData]);
 
-      await connection.commit();
-      
-      // Return the created plan object
-      return { id: planId, ...plan };
-
-    } catch (error) {
-      await connection.rollback();
-      console.error("Error in transaction, rolled back.", error);
-      throw error;
-    } finally {
-      connection.release();
+      // Update status order yang sudah dimasukkan ke route plan
+      const orderIds = stops.map(stop => stop.orderId);
+      const placeholders = orderIds.map(() => '?').join(',');
+      const updateOrdersQuery = vehicleId
+        ? `UPDATE orders SET status = 'Routed', assignedVehicleId = ? WHERE id IN (${placeholders})`
+        : `UPDATE orders SET status = 'Routed' WHERE id IN (${placeholders})`;
+      const updateParams = vehicleId ? [vehicleId, ...orderIds] : orderIds;
+      await connection.query(updateOrdersQuery, updateParams);
     }
+
+    await connection.commit();
+
+    // Return hasil plan yang dibuat
+    return { id: planId, ...plan, region: regionValue };
+
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error in transaction, rolled back.", error);
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 const deletePendingPlansForVehicle = async (vehicleId, date) => {
