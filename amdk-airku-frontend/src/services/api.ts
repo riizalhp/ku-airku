@@ -1,0 +1,61 @@
+import axios from 'axios';
+
+// Fungsi untuk menentukan base URL API
+const getApiBaseUrl = () => {
+  // 1️⃣ Cek dari environment variable (.env)
+  const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envApiUrl) {
+    return envApiUrl;
+  }
+
+  // 2️⃣ Kalau sedang di localhost (dev), pakai local backend
+  if (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  ) {
+    return 'http://localhost:3001/api';
+  }
+
+  // 3️⃣ Default (production di Vercel / hosting lain)
+  return 'https://ku-airku-production-b800.up.railway.app/api';
+};
+
+// Buat instance axios
+const api = axios.create({
+  baseURL: getApiBaseUrl(),
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor untuk handle token expired
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+      if (
+        status === 401 &&
+        ['TOKEN_EXPIRED', 'INVALID_TOKEN', 'NO_TOKEN'].includes(data.error)
+      ) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        delete api.defaults.headers.common['Authorization'];
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const setAuthToken = (token: string | null) => {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
+export default api;
