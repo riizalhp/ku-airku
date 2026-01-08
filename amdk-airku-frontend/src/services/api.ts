@@ -32,6 +32,15 @@ const api = axios.create({
   },
 });
 
+// Log all requests made with this api instance
+api.interceptors.request.use(
+  (config) => {
+    console.warn('[DEPRECATED API] Request to:', config.url, 'This should not be used for auth!');
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor untuk handle token expired
 api.interceptors.response.use(
   (response) => response,
