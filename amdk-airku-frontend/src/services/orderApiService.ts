@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { Order, OrderItem } from '../types';
+import { Order } from '../types';
 
 type CreateOrderPayload = {
     storeId: string;

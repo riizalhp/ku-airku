@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { User, Role } from '../types';
+import { User } from '../types';
 
 export const getUsers = async (): Promise<User[]> => {
     const { data, error } = await supabase.from('users').select('*');

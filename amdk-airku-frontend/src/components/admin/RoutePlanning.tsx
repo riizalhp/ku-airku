@@ -116,7 +116,7 @@ export const RoutePlanning: React.FC = () => {
     };
 
     // --- Sales Visit Planning ---
-    const [salesForm, setSalesForm] = useState({ salesPersonId: '', visitDate: new Date().toISOString().split('T')[0] });
+    const [salesForm, setSalesForm] = useState({ salesPersonId: '', visitDate: new Date().toISOString().split('T')[0], stops: [] });
 
     const createSalesMutation = useMutation({
         mutationFn: createSalesRoute,

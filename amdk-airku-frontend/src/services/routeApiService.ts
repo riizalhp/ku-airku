@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { RoutePlan, SalesVisitRoutePlan, RouteStop } from '../types';
+import { RoutePlan, SalesVisitRoutePlan } from '../types';
 
 // --- Delivery Routes ---
 export const getDeliveryRoutes = async (filters: { driverId?: string, date?: string } = {}): Promise<RoutePlan[]> => {
