@@ -252,7 +252,7 @@ const updateStopStatus = async (stopId, data, user) => {
             const [items] = await connection.query('SELECT productId, quantity FROM order_items WHERE orderId = ?', [orderId]);
             await connection.query('UPDATE orders SET status = ?, priority = ? WHERE id = ?', ['Delivered', false, orderId]);
             for (const item of items) {
-                // Finalize stock: decrease physical and reserved stock
+                // Finalize delivery: decrease stock and unreserve
                 await connection.query('UPDATE products SET stock = stock - ?, reservedStock = GREATEST(0, reservedStock - ?) WHERE id = ?', [item.quantity, item.quantity, item.productId]);
             }
         } else if (data.status === 'Failed') {

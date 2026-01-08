@@ -68,6 +68,17 @@ export const getOrders = async (): Promise<Order[]> => {
 };
 
 export const createOrder = async (orderData: CreateOrderPayload): Promise<Order> => {
+    // 0. VERIFY INVENTORY FIRST
+    for (const item of orderData.items) {
+        const { data: product } = await supabase.from('products').select('stock, reserved_stock').eq('id', item.productId).single();
+        if (!product) throw new Error(`Product ${item.productId} tidak ditemukan`);
+
+        const availableStock = product.stock - (product.reserved_stock || 0);
+        if (availableStock < item.quantity) {
+            throw new Error(`Stok ${item.productId} tidak cukup. Tersedia: ${availableStock}, Diminta: ${item.quantity}`);
+        }
+    }
+
     // 1. Calculate Total Amount (Need product prices)
     // For simplicity, fetching all products relevant or just trusted client input (bad practice but for migration step ok)
     // Better: Fetch products prices from DB first.
@@ -76,7 +87,7 @@ export const createOrder = async (orderData: CreateOrderPayload): Promise<Order>
 
     for (const item of orderData.items) {
         const { data: product } = await supabase.from('products').select('price').eq('id', item.productId).single();
-        if (!product) throw new Error(`Product ${item.productId} not found`);
+        if (!product) throw new Error(`Product ${item.productId} tidak ditemukan`);
 
         const price = item.specialPrice || product.price;
         totalAmount += price * item.quantity;
@@ -101,7 +112,7 @@ export const createOrder = async (orderData: CreateOrderPayload): Promise<Order>
 
     if (orderError) throw new Error(orderError.message);
 
-    // 3. Insert Items
+    // 3. Insert Items (This will trigger inventory update via database trigger)
     const itemsWithOrderId = itemsPayload.map(i => ({ ...i, order_id: order.id }));
     const { error: itemsError } = await supabase.from('order_items').insert(itemsWithOrderId);
 

@@ -512,8 +512,24 @@ const RequestOrder: React.FC = () => {
         mutationFn: createOrder, 
         onSuccess: () => { 
             alert('Pesanan berhasil dibuat!'); 
+            
+            // Optimistic update: langsung update reserved_stock di cache
+            queryClient.setQueryData(['products'], (oldProducts: Product[] | undefined) => {
+                if (!oldProducts) return oldProducts;
+                return oldProducts.map(product => {
+                    const cartItem = cart.find(item => item.productId === product.id);
+                    if (cartItem) {
+                        return {
+                            ...product,
+                            reservedStock: product.reservedStock + cartItem.quantity
+                        };
+                    }
+                    return product;
+                });
+            });
+            
             queryClient.invalidateQueries({queryKey: ['orders']});
-            queryClient.invalidateQueries({queryKey: ['products']});
+            queryClient.invalidateQueries({queryKey: ['products']}); // Refetch untuk konfirmasi
             setSelectedStore(''); 
             setCart([]); 
             setDesiredDeliveryDate('');

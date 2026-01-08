@@ -172,6 +172,8 @@ export interface RoutePlan {
   id: string;
   driverId: string | null;
   vehicleId: string | null;
+  driverName?: string; // Populated from JOIN
+  vehiclePlate?: string; // Populated from JOIN
   date: string;
   stops: RouteStop[];
   region: string;

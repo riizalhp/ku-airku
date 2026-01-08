@@ -126,10 +126,8 @@ const Order = {
             ]);
             await connection.query(orderItemQuery, [orderItemsData]);
             
-            // Perbarui stok yang dipesan
-            for (const item of items) {
-                await connection.query('UPDATE products SET reservedStock = reservedStock + ? WHERE id = ?', [item.quantity, item.productId]);
-            }
+            // Trigger database (trg_manage_inventory) akan otomatis handle stock & reservedStock
+            // Tidak perlu manual UPDATE di sini
 
             await connection.commit();
             return await Order.getById(orderId, connection);
@@ -153,12 +151,12 @@ const Order = {
 
             const { items, ...otherUpdates } = orderData;
             
-            // Kembalikan reservasi stok asli
+            // Kembalikan reservasi stok asli (karena akan diganti dengan order_items baru)
             for (const item of originalOrder.items) {
                 await connection.query('UPDATE products SET reservedStock = GREATEST(0, reservedStock - ?) WHERE id = ?', [item.quantity, item.productId]);
             }
 
-            // Periksa ketersediaan stok baru dan terapkan reservasi baru
+            // Periksa ketersediaan stok baru
             const productIds = items.map(item => item.productId);
             const placeholders = productIds.map(() => '?').join(',');
             const [products] = await connection.query(`SELECT * FROM products WHERE id IN (${placeholders}) FOR UPDATE`, productIds);
@@ -172,9 +170,8 @@ const Order = {
                     throw new Error(`Stok tidak mencukupi untuk ${product.name}. Tersedia: ${availableStock}, Diminta: ${item.quantity}.`);
                 }
             }
-             for (const item of items) {
-                await connection.query('UPDATE products SET reservedStock = reservedStock + ? WHERE id = ?', [item.quantity, item.productId]);
-            }
+            
+            // Trigger database akan otomatis reserve stok saat INSERT order_items baru
 
             // Perbarui detail pesanan
             const totalAmount = items.reduce((sum, item) => {
@@ -225,10 +222,7 @@ const Order = {
                 throw new Error('Only Pending orders can be deleted.');
             }
 
-            // Kembalikan stok yang dipesan
-            for (const item of orderToDelete.items) {
-                await connection.query('UPDATE products SET reservedStock = GREATEST(0, reservedStock - ?) WHERE id = ?', [item.quantity, item.productId]);
-            }
+            // Trigger database akan otomatis kembalikan stock & reservedStock saat DELETE order_items
             
             await connection.query('DELETE FROM order_items WHERE orderId = ?', [orderId]);
             const [result] = await connection.query('DELETE FROM orders WHERE id = ?', [orderId]);

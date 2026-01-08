@@ -1,53 +1,131 @@
 import { supabase } from '../lib/supabaseClient';
 import { Visit, VisitStatus } from '../types';
 
-const mapToVisit = (data: any): Visit => ({
-    id: data.id,
-    storeId: data.store_id,
-    salesPersonId: data.sales_person_id,
-    visitDate: data.visit_date,
-    purpose: data.purpose,
-    status: data.status,
-    notes: data.notes,
-    proofOfVisitImage: data.proof_of_visit_image
+// Map Logic: Joins sales_visit_route_stops + sales_visit_route_plans => Visit
+const mapToVisit = (stop: any): Visit => ({
+    id: stop.id,
+    storeId: stop.store_id,
+    salesPersonId: stop.plan?.sales_person_id,
+    visitDate: stop.plan?.date,
+    purpose: stop.purpose,
+    status: stop.status,
+    notes: stop.notes,
+    proofOfVisitImage: stop.proof_of_visit_image
 });
 
-const mapToDb = (data: Partial<Visit>) => {
-    const dbData: any = { ...data };
-    if (data.storeId !== undefined) dbData.store_id = data.storeId;
-    if (data.salesPersonId !== undefined) dbData.sales_person_id = data.salesPersonId;
-    if (data.visitDate !== undefined) dbData.visit_date = data.visitDate;
-    if (data.proofOfVisitImage !== undefined) dbData.proof_of_visit_image = data.proofOfVisitImage;
-
-    delete dbData.storeId;
-    delete dbData.salesPersonId;
-    delete dbData.visitDate;
-    delete dbData.proofOfVisitImage;
-    return dbData;
-};
-
 export const getVisits = async (): Promise<Visit[]> => {
-    const { data, error } = await supabase.from('visits').select('*');
+    // Fetch Stops joined with Plans
+    // supabase join syntax: stops!inner(..., plan:sales_visit_route_plans!inner(...))
+    const { data, error } = await supabase
+        .from('sales_visit_route_stops')
+        .select(`
+            *,
+            plan:route_id (
+                sales_person_id,
+                date
+            )
+        `);
+
     if (error) throw new Error(error.message);
     return (data || []).map(mapToVisit);
 };
 
 export const createVisit = async (visitData: Omit<Visit, 'id' | 'status'>): Promise<Visit> => {
-    const dbPayload = mapToDb({ ...visitData, status: VisitStatus.UPCOMING }); // Default status
-    const { data, error } = await supabase.from('visits').insert(dbPayload).select().single();
-    if (error) throw new Error(error.message);
-    return mapToVisit(data);
+    // 1. Ensure Route Plan exists for Date + SalesPerson
+    const { data: existingPlans } = await supabase
+        .from('sales_visit_route_plans')
+        .select('id')
+        .eq('sales_person_id', visitData.salesPersonId)
+        .eq('date', visitData.visitDate);
+
+    let planId = existingPlans && existingPlans.length > 0 ? existingPlans[0].id : null;
+
+    if (!planId) {
+        // Create new plan
+        const { data: newPlan, error: planError } = await supabase
+            .from('sales_visit_route_plans')
+            .insert({
+                sales_person_id: visitData.salesPersonId,
+                date: visitData.visitDate
+            })
+            .select()
+            .single();
+
+        if (planError) throw new Error(planError.message);
+        planId = newPlan.id;
+    }
+
+    // 2. Insert Stop
+    const { data: stop, error: stopError } = await supabase
+        .from('sales_visit_route_stops')
+        .insert({
+            route_id: planId,
+            store_id: visitData.storeId,
+            purpose: visitData.purpose,
+            status: VisitStatus.UPCOMING,
+            notes: visitData.notes
+        })
+        .select(`
+            *,
+            plan:route_id (sales_person_id, date)
+        `)
+        .single();
+
+    if (stopError) throw new Error(stopError.message);
+    return mapToVisit(stop);
 };
 
 export const updateVisit = async (payload: { id: string } & Partial<Omit<Visit, 'id'>>): Promise<Visit> => {
+    // Check if we need to move the visit (Date or SalesPerson changed)
     const { id, ...updateData } = payload;
-    const dbPayload = mapToDb(updateData);
-    const { data, error } = await supabase.from('visits').update(dbPayload).eq('id', id).select().single();
+
+    // Fetch current stop to see if plan logic is needed
+    // Simple approach: Update fields on Stop. If Date/Person changed, User might need to delete & recreate, 
+    // OR we proactively handle it. For now, let's assume UI restricts major changes or we handle pure data updates.
+    // CAUTION: 'visitDate' and 'salesPersonId' are on the PLAN, not the STOP.
+    // If these change, we must move the stop to a different plan.
+
+    if (updateData.visitDate || updateData.salesPersonId) {
+        // Migration logic: Delete old, Create new
+        // 1. Get old data to fill gaps
+        const { data: oldStop } = await supabase
+            .from('sales_visit_route_stops')
+            .select('*, plan:route_id(sales_person_id, date)')
+            .eq('id', id)
+            .single();
+
+        if (!oldStop) throw new Error("Visit not found");
+
+        const oldVisit = mapToVisit(oldStop);
+        const newVisitData = { ...oldVisit, ...updateData };
+
+        // 2. Delete old
+        await deleteVisit(id);
+
+        // 3. Create new
+        return createVisit(newVisitData);
+    }
+
+    // Standard update (status, purpose, notes)
+    const dbPayload: any = {};
+    if (updateData.purpose) dbPayload.purpose = updateData.purpose;
+    if (updateData.status) dbPayload.status = updateData.status;
+    if (updateData.notes) dbPayload.notes = updateData.notes;
+    if (updateData.proofOfVisitImage) dbPayload.proof_of_visit_image = updateData.proofOfVisitImage;
+    if (updateData.storeId) dbPayload.store_id = updateData.storeId;
+
+    const { data, error } = await supabase
+        .from('sales_visit_route_stops')
+        .update(dbPayload)
+        .eq('id', id)
+        .select(`*, plan:route_id(sales_person_id, date)`)
+        .single();
+
     if (error) throw new Error(error.message);
     return mapToVisit(data);
 };
 
 export const deleteVisit = async (visitId: string): Promise<void> => {
-    const { error } = await supabase.from('visits').delete().eq('id', visitId);
+    const { error } = await supabase.from('sales_visit_route_stops').delete().eq('id', visitId);
     if (error) throw new Error(error.message);
 };

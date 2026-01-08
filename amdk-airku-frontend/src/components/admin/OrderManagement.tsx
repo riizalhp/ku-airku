@@ -56,7 +56,23 @@ const AddEditOrderModal: React.FC<{ isOpen: boolean; onClose: () => void; orderT
     const { mutate: createMutate, isPending: isCreating } = useMutation({
         mutationFn: createOrder,
         onSuccess: () => { 
+            // Optimistic update: langsung update reserved_stock di cache
+            queryClient.setQueryData(['products'], (oldProducts: Product[] | undefined) => {
+                if (!oldProducts) return oldProducts;
+                return oldProducts.map(product => {
+                    const cartItem = cart.find(item => item.productId === product.id);
+                    if (cartItem) {
+                        return {
+                            ...product,
+                            reservedStock: product.reservedStock + cartItem.quantity
+                        };
+                    }
+                    return product;
+                });
+            });
+            
             queryClient.invalidateQueries({ queryKey: ['orders'] }); 
+            queryClient.invalidateQueries({ queryKey: ['products'] }); // Refetch untuk konfirmasi
             onClose(); 
             alert('Pesanan baru berhasil ditambahkan!');
         },

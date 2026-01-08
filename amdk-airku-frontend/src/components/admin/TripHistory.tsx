@@ -3,11 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
-import { RoutePlan, User, Vehicle, RouteStop, SalesVisitRoutePlan, VisitStatus } from '../../types';
+import { RoutePlan, RouteStop, SalesVisitRoutePlan, VisitStatus } from '../../types';
 import { getDeliveryRoutes } from '../../services/routeApiService';
 import { getSalesRoutes } from '../../services/routeApiService';
-import { getUsers } from '../../services/userApiService';
-import { getVehicles } from '../../services/vehicleApiService';
 import { Modal } from '../ui/Modal';
 import { ICONS } from '../../constants';
 import { Pagination, ItemsPerPageSelector } from '../ui/Pagination';
@@ -45,20 +43,18 @@ const DeliveryHistory: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
-    const { data: routes = [], isLoading: isLoadingRoutes } = useQuery<RoutePlan[]>({ queryKey: ['deliveryRoutes'], queryFn: () => getDeliveryRoutes() });
-    const { data: users = [], isLoading: isLoadingUsers } = useQuery<User[]>({ queryKey: ['users'], queryFn: getUsers });
-    const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({ queryKey: ['vehicles'], queryFn: getVehicles });
+    const { data: routes = [], isLoading } = useQuery<RoutePlan[]>({ queryKey: ['deliveryRoutes'], queryFn: () => getDeliveryRoutes() });
 
     const tripsWithDetails = useMemo(() => {
         return routes
             .filter(route => !filterDate || route.date === filterDate)
             .map(route => ({
                 ...route,
-                driverName: users.find(u => u.id === route.driverId)?.name || 'N/A',
-                vehiclePlate: vehicles.find(v => v.id === route.vehicleId)?.plateNumber || 'N/A',
+                driverName: route.driverName || 'N/A',
+                vehiclePlate: route.vehiclePlate || 'N/A',
             }))
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [routes, users, vehicles, filterDate]);
+    }, [routes, filterDate]);
 
     const paginatedTrips = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -72,8 +68,6 @@ const DeliveryHistory: React.FC = () => {
     React.useEffect(() => {
         setCurrentPage(1);
     }, [filterDate]);
-
-    const isLoading = isLoadingRoutes || isLoadingUsers || isLoadingVehicles;
 
     const stopsByStore = useMemo(() => {
         if (!selectedTrip) return {};

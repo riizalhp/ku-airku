@@ -11,12 +11,12 @@ import { estimateConversionRate } from '../../services/capacityApiService';
 export const ProductManagement: React.FC = () => {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const initialFormState: Omit<Product, 'id' | 'reservedStock'> = { 
-        sku: '', 
-        name: '', 
-        price: 0, 
-        stock: 0, 
-        capacityConversionHeterogeneous: 1 
+    const initialFormState: Omit<Product, 'id' | 'reservedStock'> = {
+        sku: '',
+        name: '',
+        price: 0,
+        stock: 0,
+        capacityConversionHeterogeneous: 1
     };
     const [currentProduct, setCurrentProduct] = useState<Omit<Product, 'id' | 'reservedStock'> | Product>(initialFormState);
     const [isEditing, setIsEditing] = useState(false);
@@ -28,8 +28,8 @@ export const ProductManagement: React.FC = () => {
     const [capacityPreview, setCapacityPreview] = useState<string>('');
 
     const { data: products = [], isLoading } = useQuery<Product[]>({
-      queryKey: ['products'],
-      queryFn: getProducts,
+        queryKey: ['products'],
+        queryFn: getProducts,
     });
 
     const createMutation = useMutation({
@@ -39,7 +39,10 @@ export const ProductManagement: React.FC = () => {
             setIsModalOpen(false);
             alert('Produk baru berhasil ditambahkan!');
         },
-        onError: (error: any) => setApiError(error.response?.data?.message || 'Gagal membuat produk.'),
+        onError: (error: any) => {
+            console.error("Create Product Error:", error);
+            setApiError(error.message || 'Gagal membuat produk.');
+        },
     });
 
     const updateMutation = useMutation({
@@ -49,7 +52,10 @@ export const ProductManagement: React.FC = () => {
             setIsModalOpen(false);
             alert('Data produk berhasil diperbarui!');
         },
-        onError: (error: any) => setApiError(error.response?.data?.message || 'Gagal memperbarui produk.'),
+        onError: (error: any) => {
+            console.error("Update Product Error:", error);
+            setApiError(error.message || 'Gagal memperbarui produk.');
+        },
     });
 
     const deleteMutation = useMutation({
@@ -58,14 +64,17 @@ export const ProductManagement: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             alert('Produk berhasil dihapus.');
         },
-        onError: (error: any) => alert(error.response?.data?.message || 'Gagal menghapus produk.'),
+        onError: (error: any) => {
+            console.error("Delete Product Error:", error);
+            alert(error.message || 'Gagal menghapus produk.');
+        },
     });
 
     const filteredProducts = useMemo(() => {
         return [...products].reverse().filter(product => {
             const term = searchTerm.toLowerCase();
             return product.name.toLowerCase().includes(term) ||
-                   product.sku.toLowerCase().includes(term);
+                product.sku.toLowerCase().includes(term);
         });
     }, [products, searchTerm]);
 
@@ -95,13 +104,13 @@ export const ProductManagement: React.FC = () => {
         setApiError(null);
         setIsModalOpen(true);
     };
-    
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         const isNumericField = ['price', 'stock', 'capacityConversionHeterogeneous'].includes(name);
-        setCurrentProduct(prev => ({ 
-            ...prev, 
-            [name]: isNumericField ? parseFloat(value) || 0 : value 
+        setCurrentProduct(prev => ({
+            ...prev,
+            [name]: isNumericField ? parseFloat(value) || 0 : value
         }));
     };
 
@@ -109,9 +118,9 @@ export const ProductManagement: React.FC = () => {
     useEffect(() => {
         if (autoCalculate && currentProduct.name && !isEditing) {
             const estimated = estimateConversionRate(currentProduct.name);
-            setCurrentProduct(prev => ({ 
-                ...prev, 
-                capacityConversionHeterogeneous: estimated 
+            setCurrentProduct(prev => ({
+                ...prev,
+                capacityConversionHeterogeneous: estimated
             }));
         }
     }, [currentProduct.name, autoCalculate, isEditing]);
@@ -124,7 +133,7 @@ export const ProductManagement: React.FC = () => {
             const cherryBoxCapacity = 170;
             const maxUnitsHeterogenL300 = Math.floor(l300Capacity / (currentProduct.capacityConversionHeterogeneous || 1));
             const maxUnitsHeterogenCherryBox = Math.floor(cherryBoxCapacity / (currentProduct.capacityConversionHeterogeneous || 1));
-            
+
             setCapacityPreview(
                 `📦 Kapasitas Heterogen (Produk Campur):\n` +
                 `• L300 (200 cap): ${maxUnitsHeterogenL300} unit\n` +
@@ -165,7 +174,7 @@ export const ProductManagement: React.FC = () => {
                 </button>
             </div>
 
-             <Card>
+            <Card>
                 <div className="max-w-md">
                     <label htmlFor="searchProduct" className="block text-sm font-medium text-gray-700">Cari Produk</label>
                     <input
@@ -229,7 +238,7 @@ export const ProductManagement: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                     {!isLoading && paginatedProducts.length === 0 && (
+                    {!isLoading && paginatedProducts.length === 0 && (
                         <p className="text-center text-gray-500 py-6">Tidak ada produk ditemukan.</p>
                     )}
                 </div>
@@ -271,8 +280,8 @@ export const ProductManagement: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-gray-700">⚙️ Pengaturan Kapasitas</h3>
                             <label className="flex items-center gap-2 text-sm">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     checked={autoCalculate}
                                     onChange={(e) => setAutoCalculate(e.target.checked)}
                                     disabled={isEditing}
@@ -296,16 +305,16 @@ export const ProductManagement: React.FC = () => {
                                 Konversi Kapasitas (Heterogen)
                                 <span className="text-xs text-gray-500 block mt-0.5">Nilai konversi relatif terhadap 240ml (=1.0)</span>
                             </label>
-                            <input 
-                                type="number" 
-                                step="0.01" 
-                                name="capacityConversionHeterogeneous" 
-                                id="capacityConversionHeterogeneous" 
-                                value={currentProduct.capacityConversionHeterogeneous || 1} 
-                                onChange={handleInputChange} 
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500" 
+                            <input
+                                type="number"
+                                step="0.01"
+                                name="capacityConversionHeterogeneous"
+                                id="capacityConversionHeterogeneous"
+                                value={currentProduct.capacityConversionHeterogeneous || 1}
+                                onChange={handleInputChange}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500"
                                 disabled={autoCalculate && !isEditing}
-                                required 
+                                required
                             />
                         </div>
 
@@ -317,10 +326,10 @@ export const ProductManagement: React.FC = () => {
                         )}
                     </div>
                     {isEditing && 'reservedStock' in currentProduct &&
-                         <p className="text-sm text-yellow-700 bg-yellow-100 p-2 rounded-md">Stok dipesan saat ini: {currentProduct.reservedStock}. Mengubah stok fisik tidak akan memengaruhi stok yang sudah dipesan.</p>
+                        <p className="text-sm text-yellow-700 bg-yellow-100 p-2 rounded-md">Stok dipesan saat ini: {currentProduct.reservedStock}. Mengubah stok fisik tidak akan memengaruhi stok yang sudah dipesan.</p>
                     }
                     <div className="flex justify-end pt-4">
-                         <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg mr-2 hover:bg-gray-300">Batal</button>
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg mr-2 hover:bg-gray-300">Batal</button>
                         <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-brand-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-brand-dark disabled:bg-gray-400">
                             {createMutation.isPending || updateMutation.isPending ? 'Menyimpan...' : (isEditing ? "Simpan Perubahan" : "Tambah Produk")}
                         </button>

@@ -27,8 +27,8 @@ export const DriverView: React.FC = () => {
 
     // -- Data Fetching --
     const { data: allRoutes = [], isLoading: isLoadingRoutes } = useQuery<RoutePlan[]>({
-        queryKey: ['deliveryRoutes', { driverId: currentUser?.id, date: new Date().toISOString().split('T')[0] }],
-        queryFn: () => getDeliveryRoutes({ driverId: currentUser?.id, date: new Date().toISOString().split('T')[0] }),
+        queryKey: ['deliveryRoutes', { driverId: currentUser?.id }],
+        queryFn: () => getDeliveryRoutes({ driverId: currentUser?.id }),
         enabled: !!currentUser,
     });
     const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({ 
@@ -65,7 +65,16 @@ export const DriverView: React.FC = () => {
     });
 
     // -- Derived State from Data (Memos) --
-    const todayRoutes = useMemo(() => allRoutes.sort((a, b) => a.id.localeCompare(b.id)), [allRoutes]);
+    const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const todayRoutes = useMemo(() =>
+        allRoutes
+            .filter(r => r.date === today) // hanya hari ini untuk view utama driver
+            .sort((a, b) => a.id.localeCompare(b.id))
+    , [allRoutes, today]);
+
+    const allRoutesSorted = useMemo(() =>
+        [...allRoutes].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+    , [allRoutes]);
     const vehicleForTodaysRoute = useMemo(() => todayRoutes.length > 0 && vehicles.length > 0 ? vehicles.find(v => v.id === todayRoutes[0].vehicleId) : null, [todayRoutes, vehicles]);
     const isStarted = useMemo(() => vehicleForTodaysRoute?.status === VehicleStatus.DELIVERING, [vehicleForTodaysRoute]);
     const activeTrip = useMemo(() => isStarted ? todayRoutes[activeTripIndex] : null, [isStarted, todayRoutes, activeTripIndex]);
@@ -147,12 +156,12 @@ export const DriverView: React.FC = () => {
         }
         if (!activeTrip) return <NoRoutesMessage />;
 
-        type StoreGroup = { storeName: string; address: string; orders: RouteStop[] };
+        type StoreGroup = { storeName: string; address: string; location: any; orders: RouteStop[] };
         const stopsByStore = useMemo(() => {
             if (!activeTrip) return {};
             return activeTrip.stops.reduce<Record<string, StoreGroup>>((acc, stop) => {
                 if (!acc[stop.storeId]) {
-                    acc[stop.storeId] = { storeName: stop.storeName, address: stop.address, orders: [] };
+                    acc[stop.storeId] = { storeName: stop.storeName, address: stop.address, location: stop.location, orders: [] };
                 }
                 acc[stop.storeId].orders.push(stop);
                 return acc;
@@ -161,6 +170,16 @@ export const DriverView: React.FC = () => {
 
         const storeGroups = useMemo(() => Object.values(stopsByStore), [stopsByStore]);
         const currentStoreGroupIndex = useMemo(() => storeGroups.findIndex(group => group.orders.some(o => o.status === 'Pending')), [storeGroups]);
+        
+        // Helper function to calculate distance between two locations
+        const getDistance = (loc1: any, loc2: any): number => {
+            const R = 6371; // Earth's radius in km
+            const dLat = ((loc2.lat - loc1.lat) * Math.PI) / 180;
+            const dLng = ((loc2.lng - loc1.lng) * Math.PI) / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos((loc1.lat * Math.PI) / 180) * Math.cos((loc2.lat * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        };
         
         return (
             <div className="p-4 space-y-4">
@@ -174,6 +193,16 @@ export const DriverView: React.FC = () => {
                     {storeGroups.map((storeGroup, groupIndex) => {
                         const isCurrentStore = groupIndex === currentStoreGroupIndex;
                         const isGroupCompleted = storeGroup.orders.every(o => o.status !== 'Pending');
+                        
+                        // Calculate distance from previous store or depot
+                        let distanceFromPrev = 0;
+                        if (groupIndex === 0) {
+                            // First store: distance from depot
+                            distanceFromPrev = getDistance(depotLocation, storeGroup.location);
+                        } else {
+                            // Other stores: distance from previous store
+                            distanceFromPrev = getDistance(storeGroups[groupIndex - 1].location, storeGroup.location);
+                        }
     
                         return (
                             <Card key={storeGroup.storeName + groupIndex} className={`p-4 transition-all ${isCurrentStore ? 'border-2 border-brand-primary shadow-xl' : ''} ${isGroupCompleted ? 'opacity-60 bg-gray-50' : 'bg-white'}`}>
@@ -185,7 +214,7 @@ export const DriverView: React.FC = () => {
                                         <div>
                                             <p className={`font-bold text-lg ${isGroupCompleted ? 'line-through' : ''}`}>{storeGroup.storeName}</p>
                                             <p className="text-gray-600 text-sm">{storeGroup.address}</p>
-                                            <p className="text-xs text-brand-dark font-semibold mt-1">Jarak dari titik sebelumnya: {storeGroup.orders[0]?.distanceFromPrev?.toFixed(2) ?? '0.00'} km</p>
+                                            <p className="text-xs text-brand-dark font-semibold mt-1">Jarak dari titik sebelumnya: {distanceFromPrev.toFixed(2)} km</p>
                                         </div>
                                     </div>
                                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeGroup.address)}`} target="_blank" rel="noopener noreferrer" className="p-2 text-brand-primary">
@@ -236,8 +265,8 @@ export const DriverView: React.FC = () => {
     }
 
     const RouteListView: React.FC = () => {
-        if(todayRoutes.length === 0) return <NoRoutesMessage />;
-        return (<div className="p-4 space-y-4">{todayRoutes.map((route, index) => {
+        if(allRoutesSorted.length === 0) return <NoRoutesMessage />;
+        return (<div className="p-4 space-y-4">{allRoutesSorted.map((route, index) => {
             const isCurrent = isStarted && index === activeTripIndex && !showInterstitial;
             const isCompleted = route.stops.every(s => s.status !== 'Pending');
             const completedStops = route.stops.filter(s => s.status !== 'Pending').length;

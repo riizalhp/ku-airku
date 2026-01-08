@@ -3,10 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
-// --- CONFIG ---
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://zqnhqzyhkmcusiainkkn.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SQL_FILE_PATH = path.resolve('..', 'amdk_airku_db.sql');
+const SQL_FILE_PATH = path.resolve('..', '..', 'ku_airku_db.sql');
 
 if (!SUPABASE_SERVICE_KEY) {
     console.error('Missing SUPABASE_SERVICE_ROLE_KEY');
@@ -15,7 +14,6 @@ if (!SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// --- HELPER: Parse just the USERS table from SQL ---
 function parseUsers(sqlContent) {
     const regex = /INSERT INTO\s+`users`\s*\(([^)]+)\)\s*VALUES\s*([\s\S]+?);/gmi;
     const match = regex.exec(sqlContent);
@@ -64,7 +62,7 @@ function cleanValue(val) {
 }
 
 async function fixUsers() {
-    console.log('--- Fixing User Migration ---');
+    console.log('--- Fixing User Migration (Email Lookup Strategy) ---');
     if (!fs.existsSync(SQL_FILE_PATH)) {
         console.error('SQL file not found!');
         return;
@@ -75,16 +73,21 @@ async function fixUsers() {
     console.log(`Found ${users.length} users in SQL dump.`);
 
     for (const user of users) {
-        console.log(`Processing: ${user.name} (${user.email}) - ID: ${user.id}`);
+        console.log(`Processing: ${user.name} (${user.email})`);
 
-        // 1. Create Auth User
-        // We use upsert-like logic: check exist, if not create.
-        const { data: existingUser } = await supabase.auth.admin.getUserById(user.id);
+        // Check if user exists in Auth by Email
+        // Note: listUsers is paginated but for small lists default is 50.
+        // For robustness, ideally we fetch by email directly if API supports, or search.
+        // admin.listUsers() doesn't filter by email directly in older versions? 
+        // Newer version has filtering. Let's try listUsers with no filter and find. Since < 10 users.
+        const { data: { users: authUsers }, error: listError } = await supabase.auth.admin.listUsers();
 
-        if (!existingUser || !existingUser.user) {
+        let authUser = authUsers ? authUsers.find(u => u.email.toLowerCase() === user.email.toLowerCase()) : null;
+        let authId = authUser ? authUser.id : null;
+
+        if (!authId) {
             console.log('   Creating Supabase Auth user...');
-            const { error: createError } = await supabase.auth.admin.createUser({
-                id: user.id, // FORCE ID
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email: user.email,
                 password: 'password123',
                 email_confirm: true,
@@ -92,19 +95,17 @@ async function fixUsers() {
             });
             if (createError) {
                 console.error(`   ❌ Auth Create Failed: ${createError.message}`);
-                // Continue anyway, maybe it failed because email exists under different ID?
-            } else {
-                console.log('   ✅ Auth user created.');
+                continue; // Can't proceed if no Auth User
             }
+            authId = newUser.user.id;
+            console.log(`   ✅ Auth user created (ID: ${authId})`);
         } else {
-            console.log('   ℹ️ Auth user already exists.');
+            console.log(`   ℹ️ Auth user found (ID: ${authId})`);
         }
 
-        // 2. Insert into Public Users
-        // Now that Auth user exists (or we attempted), try inserting public profile.
-        // We use upsert to overwrite/ensure consistency.
+        // 2. Insert into Public Users using AUTH ID
         const { error: upsertError } = await supabase.from('users').upsert({
-            id: user.id,
+            id: authId, // Use the correct Auth ID
             name: user.name,
             role: user.role,
             email: user.email

@@ -1,5 +1,5 @@
 -- 1. SURVEY RESPONSES
-CREATE TABLE public.survey_responses (
+CREATE TABLE IF NOT EXISTS public.survey_responses (
   id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   sales_person_id uuid REFERENCES public.users(id),
   survey_date date NOT NULL,
@@ -15,26 +15,19 @@ CREATE TABLE public.survey_responses (
   created_at timestamptz DEFAULT now()
 );
 
+-- Note: Policies will fail if they already exist, but that is fine/expected if tables exist.
+-- To be safe, we can wrap them or just ignore errors in dashboard.
 ALTER TABLE public.survey_responses ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Read surveys" ON public.survey_responses FOR SELECT USING (true);
-CREATE POLICY "Create surveys" ON public.survey_responses FOR INSERT WITH CHECK (auth.uid() = sales_person_id);
-
 -- 2. SALES VISIT ROUTE PLANS
-CREATE TABLE public.sales_visit_route_plans (
+CREATE TABLE IF NOT EXISTS public.sales_visit_route_plans (
   id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   sales_person_id uuid REFERENCES public.users(id),
   date date NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 
-ALTER TABLE public.sales_visit_route_plans ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Read sales routes" ON public.sales_visit_route_plans FOR SELECT USING (true);
-CREATE POLICY "Manage sales routes" ON public.sales_visit_route_plans FOR ALL USING (
-  (auth.jwt() -> 'user_metadata' ->> 'role') IN ('Admin', 'Sales')
-);
-
 -- 3. SALES VISIT ROUTE STOPS
-CREATE TABLE public.sales_visit_route_stops (
+CREATE TABLE IF NOT EXISTS public.sales_visit_route_stops (
   id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   route_id uuid REFERENCES public.sales_visit_route_plans(id) ON DELETE CASCADE,
   store_id uuid REFERENCES public.stores(id),
