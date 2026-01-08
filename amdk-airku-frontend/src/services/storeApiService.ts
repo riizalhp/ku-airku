@@ -61,7 +61,7 @@ export const deleteStore = async (storeId: string): Promise<void> => {
     if (error) throw new Error(error.message);
 };
 
-export const classifyRegion = async (): Promise<{ region: string }> => {
+export const classifyRegion = async (coords: Coordinate): Promise<{ region: string }> => {
     // Temporary client-side classification or stub
     // Ideal: Supabase Edge Function with PostGIS
     console.warn('classifyRegion is currently a stub in Supabase migration');
