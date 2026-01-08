@@ -2,6 +2,9 @@ import axios from 'axios';
 
 // Fungsi untuk menentukan base URL API
 const getApiBaseUrl = () => {
+  // NOTE: This api instance is deprecated. The app now uses Supabase for all API calls.
+  // Only kept for backward compatibility with shipment and capacity services.
+  
   // 1️⃣ Cek dari environment variable (.env)
   const envApiUrl = (import.meta as any).env?.VITE_API_URL;
   if (envApiUrl) {
@@ -16,7 +19,8 @@ const getApiBaseUrl = () => {
     return 'http://localhost:3001/api';
   }
 
-  // 3️⃣ Default (production di Vercel / hosting lain)
+  // 3️⃣ For production, this should not be used anymore. All API calls should go through Supabase.
+  console.warn('Using deprecated railway API. Please migrate to Supabase.');
   return 'https://ku-airku-production-b800.up.railway.app/api';
 };
 
