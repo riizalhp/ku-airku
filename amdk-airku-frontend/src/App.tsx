@@ -22,7 +22,8 @@ const LoginView: React.FC<{ onSwitchToRegister: () => void }> = ({ onSwitchToReg
         try {
             await login(email, password);
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login gagal. Silakan coba lagi.');
+            // Supabase error format
+            setError(err.message || 'Login gagal. Silakan coba lagi.');
             setIsLoading(false);
         }
     };
